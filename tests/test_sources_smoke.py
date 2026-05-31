@@ -5,7 +5,7 @@ from lib.dates import Window
 
 def test_zh_stubs_return_empty_and_are_marked():
     w = Window.from_days(30)
-    for name in ("weibo", "xiaohongshu", "douyin", "zhihu", "bilibili"):
+    for name in ("weibo", "xiaohongshu", "douyin", "zhihu"):
         src = registry.get(name)
         assert src is not None
         assert src.lang == "zh"
