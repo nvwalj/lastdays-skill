@@ -60,7 +60,7 @@ For each entry under `WEB LAYERS TO FILL`, use WebSearch (and WebFetch to confir
 
 - **Open web**: `"<topic>" <recent month/year>` — articles, blogs, release notes.
 - **X / Twitter**: `"<topic>" site:x.com`.
-- **Chinese platforms** (when `--lang zh`/`both`): `"<topic>" site:weibo.com` (微博), `site:xiaohongshu.com` (小红书), `site:douyin.com` (抖音), `site:zhihu.com` (知乎), `site:bilibili.com` (B站). These are engine stubs today, so you cover them via WebSearch.
+- **Chinese platforms** (when `--lang zh`/`both`): Bilibili and Douyin are handled by the engine itself (see the status note below) — do **not** re-cover them via WebSearch. The three still-stubbed platforms you cover via WebSearch are `"<topic>" site:weibo.com` (微博), `site:xiaohongshu.com` (小红书), `site:zhihu.com` (知乎).
 
 These layers have **no structured engagement numbers** — never invent likes/upvotes for them.
 
