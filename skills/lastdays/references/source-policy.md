@@ -8,12 +8,20 @@
 | GitHub | en | Python engine (Search API) | comments, reactions | ✅ implemented, keyless* |
 | Reddit | en | Python engine (public `.json`) | score, comments, upvote_ratio | ✅ implemented, keyless** |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
-| Weibo 微博 | zh | agent WebSearch (`site:weibo.com`) | — | ⏳ engine stub |
-| Xiaohongshu 小红书 | zh | agent WebSearch (`site:xiaohongshu.com`) | — | ⏳ engine stub |
-| Douyin 抖音 | zh | agent WebSearch (`site:douyin.com`) | — | ⏳ engine stub |
-| Zhihu 知乎 | zh | agent WebSearch (`site:zhihu.com`) | — | ⏳ engine stub |
 | Bilibili B站 | zh | Python engine (wbi search) | views, danmaku, favorites | ✅ implemented, keyless |
+| Weibo 微博 | zh | agent WebSearch (`site:weibo.com`) | — | ⏳ stub — login-walled*** |
+| Zhihu 知乎 | zh | agent WebSearch (`site:zhihu.com`) | — | ⏳ stub — anti-bot*** |
+| Xiaohongshu 小红书 | zh | agent WebSearch (`site:xiaohongshu.com`) | — | ⏳ stub — login-walled |
+| Douyin 抖音 | zh | agent WebSearch (`site:douyin.com`) | — | ⏳ stub — login-walled |
 | Open web / X | en/any | agent WebSearch | — | covered by the agent |
+
+\*\*\* Probed 2026-05-30: **Zhihu** returns `40352` (风控/needs login) and requires an
+`x-zse-96` signed header + login cookie — not viable keyless. **Weibo** (`m.weibo.cn`
+getIndex, both 综合 type=1 and 实时 type=61) returns `ok=-100` anonymously / from
+overseas IPs — needs a login cookie. Both stay on the WebSearch fallback. Of the
+Chinese platforms, only **Bilibili** is keyless-friendly (public `wbi` md5 sign), so it
+is the only one wired into the engine. Implementing Weibo/Xiaohongshu/Douyin for real
+needs a locally-authenticated cookie/bridge — see the guide below.
 
 \* GitHub is keyless but unauthenticated search is rate-limited (~10 req/min); set `GITHUB_TOKEN` to raise it.
 \*\* Reddit and Polymarket public endpoints often return HTTP 403 from datacenter IPs. On a residential machine they usually work; when blocked the engine degrades to `[]` and records the error, and the agent supplements via WebSearch.
