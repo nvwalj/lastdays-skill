@@ -12,7 +12,7 @@
 | Xiaohongshu 小红书 | zh | agent WebSearch (`site:xiaohongshu.com`) | — | ⏳ engine stub |
 | Douyin 抖音 | zh | agent WebSearch (`site:douyin.com`) | — | ⏳ engine stub |
 | Zhihu 知乎 | zh | agent WebSearch (`site:zhihu.com`) | — | ⏳ engine stub |
-| Bilibili B站 | zh | agent WebSearch (`site:bilibili.com`) | — | ⏳ engine stub |
+| Bilibili B站 | zh | Python engine (wbi search) | views, danmaku, favorites | ✅ implemented, keyless |
 | Open web / X | en/any | agent WebSearch | — | covered by the agent |
 
 \* GitHub is keyless but unauthenticated search is rate-limited (~10 req/min); set `GITHUB_TOKEN` to raise it.

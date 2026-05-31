@@ -78,6 +78,6 @@ Read `references/synthesis-rules.md` and follow it. In short: first line is the 
 - `--lang zh` routes the five Chinese platforms to your WebSearch layer; `--lang both` adds them on top of the English engine sources.
 - `--allow-undated` keeps items with no detectable date (off by default).
 - You write the synthesis here in chat (zero cost). `--synthesize` (engine-side LLM) is for headless/cron only - do not use it in this interactive flow.
-- Chinese sources are registered **stubs** today — see `references/source-policy.md` for the contract and how to implement one for real.
+- Chinese sources: **Bilibili is live in the engine** (`--sources bilibili`, or it runs under `--lang zh`/`both`) with real views/danmaku/favorites. Weibo / Xiaohongshu / Douyin / Zhihu are still stubs — the agent covers them via WebSearch. See `references/source-policy.md` for the contract and how to implement the rest.
 
 If the user gives no topic, ask once for a topic and stop. Do not run the engine or WebSearch on an empty topic.

@@ -69,7 +69,8 @@ reliable headless brief, use `--provider anthropic` with `ANTHROPIC_API_KEY`, or
 | GitHub | en | ✅ Search API | comments, reactions | keyless (`GITHUB_TOKEN` lifts limit) |
 | Reddit | en | ✅ public `.json` | score, comments | keyless (403 on datacenter IPs → agent supplements) |
 | Polymarket | en | ✅ Gamma | volume | keyless (403 on datacenter IPs → agent supplements) |
-| Weibo / Xiaohongshu / Douyin / Zhihu / Bilibili | zh | ⏳ stub | — | agent WebSearch `site:` for now |
+| Bilibili B站 | zh | ✅ wbi search | views, danmaku, favorites | keyless (anonymous buvid3 + wbi md5 sign) |
+| Weibo / Xiaohongshu / Douyin / Zhihu | zh | ⏳ stub | — | agent WebSearch `site:` for now |
 | Open web / X | any | — | — | agent WebSearch |
 
 See [`skills/lastdays/references/source-policy.md`](skills/lastdays/references/source-policy.md)

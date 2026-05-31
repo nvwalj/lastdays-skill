@@ -20,7 +20,7 @@ from typing import Callable, Optional
 
 # Sources the Python engine actually executes itself (zero-key, real engagement).
 # Everything else (web, x, and the zh stubs) is routed to the agent's WebSearch.
-ENGINE_SOURCES = frozenset({"reddit", "hackernews", "github", "polymarket"})
+ENGINE_SOURCES = frozenset({"reddit", "hackernews", "github", "polymarket", "bilibili"})
 
 
 @dataclass(frozen=True)
