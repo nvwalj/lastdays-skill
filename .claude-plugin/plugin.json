@@ -1,0 +1,21 @@
+{
+  "name": "lastdays",
+  "version": "0.1.0",
+  "description": "Research what people actually said about a topic over the last N days (default 30, configurable). Zero-key engine for Reddit, Hacker News, GitHub, and Polymarket with real engagement, plus agent-driven web/X/Chinese layers. Claude + OpenAI, subscription-friendly, no API key required.",
+  "author": {
+    "name": "nvwalj"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "trends",
+    "recency",
+    "reddit",
+    "hackernews",
+    "github",
+    "polymarket",
+    "news",
+    "multi-source",
+    "citations"
+  ]
+}

@@ -1,0 +1,12 @@
+interface:
+  display_name: "lastdays"
+  short_description: "Research a topic over the last N days (default 30) across Reddit, Hacker News, GitHub, and Polymarket with real engagement, plus web/X via search. Returns one grounded, cited brief."
+  default_prompt: "Research this topic over the last 30 days. Run the lastdays engine for zero-key sources (Reddit, Hacker News, GitHub, Polymarket), supplement the open web and X via search, keep only items inside the window, and synthesize what people actually said - with engagement numbers and inline citations."
+  brand_color: "#2F6FED"
+
+policy:
+  allow_implicit_invocation: true
+
+# OpenAI Codex harness adapter. Runs on a ChatGPT/Codex subscription login - no
+# API key required. The skill contract lives in ../skills/lastdays/SKILL.md; the
+# engine is invoked the same way (python3 scripts/lastdays.py ...).

@@ -1,0 +1,15 @@
+[project]
+name = "lastdays"
+version = "0.1.0"
+description = "Engine for the lastdays skill: research a topic over the last N days across Reddit, Hacker News, GitHub, and Polymarket. Stdlib-only, zero third-party dependencies."
+requires-python = ">=3.12"
+dependencies = []
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
