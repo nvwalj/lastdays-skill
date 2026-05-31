@@ -9,10 +9,10 @@
 | Reddit | en | Python engine (public `.json`) | score, comments, upvote_ratio | ✅ implemented, keyless** |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
 | Bilibili B站 | zh | Python engine (wbi search) | views, danmaku, favorites | ✅ implemented, keyless |
+| Douyin 抖音 | zh | Python engine (hot-search board) | hot_value, rank | ✅ implemented, keyless — see note**** |
 | Weibo 微博 | zh | agent WebSearch (`site:weibo.com`) | — | ⏳ stub — login-walled*** |
 | Zhihu 知乎 | zh | agent WebSearch (`site:zhihu.com`) | — | ⏳ stub — anti-bot*** |
 | Xiaohongshu 小红书 | zh | agent WebSearch (`site:xiaohongshu.com`) | — | ⏳ stub — login-walled |
-| Douyin 抖音 | zh | agent WebSearch (`site:douyin.com`) | — | ⏳ stub — login-walled |
 | Open web / X | en/any | agent WebSearch | — | covered by the agent |
 
 \*\*\* Probed 2026-05-30: **Zhihu** returns `40352` (风控/needs login) and requires an
@@ -22,6 +22,15 @@ overseas IPs — needs a login cookie. Both stay on the WebSearch fallback. Of t
 Chinese platforms, only **Bilibili** is keyless-friendly (public `wbi` md5 sign), so it
 is the only one wired into the engine. Implementing Weibo/Xiaohongshu/Douyin for real
 needs a locally-authenticated cookie/bridge — see the guide below.
+
+\*\*\*\* **Douyin is a hot-search-board source, not a general search.** Douyin's
+content search needs an `a_bogus` signature, but the hot-search billboard
+(`douyin.com/aweme/v1/web/hot/search/list`) is public and unsigned. So this source
+answers "is the topic trending on Douyin right now?" — it returns board entries
+(hot topic + hot_value + rank) whose word matches the query, not arbitrary videos.
+Expect hits only when the query overlaps the live top-50 (great for breaking
+events, often empty for niche/evergreen topics). Entries carry `event_time`, so
+they are still window-filtered.
 
 \* GitHub is keyless but unauthenticated search is rate-limited (~10 req/min); set `GITHUB_TOKEN` to raise it.
 \*\* Reddit and Polymarket public endpoints often return HTTP 403 from datacenter IPs. On a residential machine they usually work; when blocked the engine degrades to `[]` and records the error, and the agent supplements via WebSearch.

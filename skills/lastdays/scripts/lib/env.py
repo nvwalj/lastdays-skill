@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 CONFIG_DIR = Path.home() / ".config" / "lastdays"
-KEYCHAIN_KEYS = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "BILI_COOKIE")
+KEYCHAIN_KEYS = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "BILI_COOKIE", "WEIBO_SUB")
 
 
 def _parse_env_file(path: Path) -> dict:

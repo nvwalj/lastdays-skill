@@ -78,6 +78,6 @@ Read `references/synthesis-rules.md` and follow it. In short: first line is the 
 - `--lang zh` routes the five Chinese platforms to your WebSearch layer; `--lang both` adds them on top of the English engine sources.
 - `--allow-undated` keeps items with no detectable date (off by default).
 - You write the synthesis here in chat (zero cost). `--synthesize` (engine-side LLM) is for headless/cron only - do not use it in this interactive flow.
-- Chinese sources: **Bilibili is live in the engine** (`--sources bilibili`, or it runs under `--lang zh`/`both`) with real views/danmaku/favorites. Weibo / Xiaohongshu / Douyin / Zhihu are still stubs — the agent covers them via WebSearch. See `references/source-policy.md` for the contract and how to implement the rest.
+- Chinese sources: **Bilibili and Douyin are live in the engine** (`--sources bilibili,douyin`, or they run under `--lang zh`/`both`). Bilibili is full video search (real views/danmaku/favorites). Douyin is the hot-search board (hot_value + rank) — it only hits when the topic is trending right now, so expect it to be empty for niche/evergreen queries; say so in the brief rather than implying Douyin had nothing to say. Weibo / Xiaohongshu / Zhihu are still stubs — the agent covers them via WebSearch. See `references/source-policy.md`.
 
 If the user gives no topic, ask once for a topic and stop. Do not run the engine or WebSearch on an empty topic.
