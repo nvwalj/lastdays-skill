@@ -6,7 +6,7 @@
 |--------|------|---------------|-------------------|--------|
 | Hacker News | en | Python engine (Algolia API) | points, comments | ✅ implemented, keyless |
 | GitHub | en | Python engine (Search API) | comments, reactions | ✅ implemented, keyless* |
-| Reddit | en | Python engine (public `.json`) | score, comments, upvote_ratio | ✅ implemented, keyless** |
+| Reddit | en | Python engine (`.json`, RSS fallback) | score, comments (json only) | ✅ implemented, keyless** |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
 | Bilibili B站 | zh | Python engine (wbi search) | views, danmaku, favorites | ✅ implemented, keyless |
 | Douyin 抖音 | zh | Python engine (hot-search board) | hot_value, rank | ✅ implemented, keyless — see note**** |
@@ -33,7 +33,7 @@ events, often empty for niche/evergreen topics). Entries carry `event_time`, so
 they are still window-filtered.
 
 \* GitHub is keyless but unauthenticated search is rate-limited (~10 req/min); set `GITHUB_TOKEN` to raise it.
-\*\* Reddit and Polymarket public endpoints often return HTTP 403 from datacenter IPs. On a residential machine they usually work; when blocked the engine degrades to `[]` and records the error, and the agent supplements via WebSearch.
+\*\* Reddit's `.json` returns HTTP 403 from datacenter IPs; the engine then falls back to `search.rss`, which IS reachable but carries **no engagement** (title/link/author/date only — such items are tagged `metadata.via=rss` and scored without upvotes, never faked). Residential IPs get the richer `.json` path with real score/comments. Polymarket's public API can also 403 from some IPs; it degrades to `[]` and records the error. HN multi-word queries use Algolia `optionalWords` so phrases like "US stock market" don't AND themselves to zero.
 
 ## Time window
 

@@ -27,6 +27,13 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
         "numericFilters": f"created_at_i>{from_ts},points>1",
         "hitsPerPage": str(count),
     }
+    # Algolia ANDs query tokens by default, so a multi-word phrase like
+    # "US stock market" matches only titles containing all three words -> often 0.
+    # Mark every token after the first as optional: Algolia then ranks by how many
+    # tokens match instead of requiring all of them.
+    tokens = query.split()
+    if len(tokens) > 1:
+        params["optionalWords"] = " ".join(tokens[1:])
     resp = http.get(f"{ALGOLIA}?{urlencode(params)}", timeout=20, retries=2)
     items: list[Item] = []
     for hit in resp.get("hits", []):
