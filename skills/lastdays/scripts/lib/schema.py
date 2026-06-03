@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from .script_detect import detect_script, is_foreign
+
 
 def _clean(d: dict) -> dict:
     """Drop None / empty values so JSON output stays compact."""
@@ -32,6 +34,14 @@ class Item:
     score: float = 0.0                # 0..100, computed by score.py
     item_id: str = ""
     metadata: dict = field(default_factory=dict)
+
+    def title_script(self) -> str:
+        """Dominant writing script of the title (zh/en/ja/ko/ru/...)."""
+        return detect_script(self.title)
+
+    def is_foreign(self) -> bool:
+        """True when the title is neither Chinese nor English (translate-or-skip)."""
+        return is_foreign(self.title)
 
     def engagement_total(self) -> float:
         """Single headline engagement number for cross-source normalization."""
@@ -59,6 +69,9 @@ class Item:
                 "relevance": round(self.relevance, 3),
                 "score": round(self.score, 1),
                 "item_id": self.item_id,
+                # Flag non-Chinese/English titles so the consumer can translate or
+                # skip them instead of copying foreign characters into the brief.
+                "title_script": self.title_script() if self.is_foreign() else None,
                 "metadata": self.metadata or {},
             }
         )

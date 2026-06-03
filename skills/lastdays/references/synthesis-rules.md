@@ -31,6 +31,7 @@ section each, and a `## Head-to-head` line instead of the `What I learned:` shap
 - **Strict window.** Only cite content dated within the window. If you could not verify a date, say so or drop it.
 - **Empty/blocked sources are stated, not hidden.** If Reddit was blocked or a Chinese platform returned nothing, say it in the coverage line and lower confidence for that angle.
 - **Match the user's language.** Chinese topic or `--lang zh` → write the brief in Chinese. English topic → English.
+- **Never copy foreign-script text verbatim.** Engine items whose title is neither Chinese nor English are flagged `⚠ lang=ja|ko|ru|...` in the evidence (and `title_script` in JSON). For those, translate the title into the brief's language or skip the item — do NOT paste Japanese/Korean/other-script characters into the reply.
 - **No trailing `Sources:` / `References:` dump.** WebSearch's tool output asks for a trailing Sources list; that does NOT apply here. Your inline `[name](url)` citations plus the coverage line are the citations. End at the brief.
 - **No em-dashes / en-dashes** as separators — use ` - `. No invented headline beyond the badge.
 
