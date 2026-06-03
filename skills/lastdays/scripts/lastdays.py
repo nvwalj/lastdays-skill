@@ -27,7 +27,7 @@ if sys.version_info < MIN_PYTHON:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from lib import dates, normalize, registry, score  # noqa: E402
+from lib import dates, normalize, registry, score, tiers  # noqa: E402
 from lib import env as env_mod  # noqa: E402
 from lib import http as http_mod  # noqa: E402
 from lib import providers  # noqa: E402
@@ -82,7 +82,8 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
     )
 
     def _fetch(name):
-        return name, registry.get(name).fetch(topic, window, env=config, depth=depth)
+        items, _tier = tiers.run_tiers(registry.get(name), topic, window, env=config, depth=depth)
+        return name, items
 
     raw: dict[str, list] = {}
     if engine_targets:

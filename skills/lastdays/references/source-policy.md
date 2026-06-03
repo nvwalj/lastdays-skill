@@ -33,7 +33,11 @@ events, often empty for niche/evergreen topics). Entries carry `event_time`, so
 they are still window-filtered.
 
 \* GitHub is keyless but unauthenticated search is rate-limited (~10 req/min); set `GITHUB_TOKEN` to raise it.
-\*\* Reddit's `.json` returns HTTP 403 from datacenter IPs; the engine then falls back to `search.rss`, which IS reachable but carries **no engagement** (title/link/author/date only — such items are tagged `metadata.via=rss` and scored without upvotes, never faked). Residential IPs get the richer `.json` path with real score/comments. Polymarket's public API can also 403 from some IPs; it degrades to `[]` and records the error. HN multi-word queries use Algolia `optionalWords` so phrases like "US stock market" don't AND themselves to zero.
+\*\* Reddit uses the **tier fallback framework** (see below): tier `json` (quality 100, real score/comments) then tier `rss` (quality 40, degraded). `.json` returns HTTP 403 from datacenter IPs; the runner then tries `search.rss`, which IS reachable but carries **no engagement**. Because the RSS tier can't rank by upvotes, it additionally drops titles that don't match the query (a relevance gate) so noise like "Flea market find" can't ride in on the word "market". RSS items are tagged `metadata.degraded=true` + `metadata.tier=rss`, scored without upvotes (never faked), and marked `⚠ degraded:rss` in the evidence. Residential IPs get the richer `.json` path. Polymarket's public API can also 403 from some IPs; it degrades to `[]` and records the error. HN multi-word queries use Algolia `optionalWords` so phrases like "US stock market" don't AND themselves to zero.
+
+## Tier fallback framework
+
+A source can declare ordered `tiers` instead of a single `fetch` (`lib/registry.py` `Tier`, run by `lib/tiers.py`). Each tier has a `quality` (higher tried first; negatives are last-resort, the firecrawl convention) and a `degraded` flag. The runner uses the first tier that returns results; a tier that errors is skipped and the next runs. Items get `metadata.tier` (which strategy produced them) and, for degraded tiers, `metadata.degraded=true`. Degraded means "this path can't return a full signal" (e.g. no engagement) — such items are scored without the missing signal, relevance-gated to suppress noise, and flagged in the brief. Reddit (`json`→`rss`) is the first source on this framework; single-`fetch` sources are transparently treated as one non-degraded tier.
 
 ## Time window
 

@@ -35,6 +35,8 @@ def render_compact(report: Report) -> str:
                 head += f" | {eng}"
             if it.is_foreign():
                 head += f" | ⚠ lang={it.title_script()} (translate or skip; do not copy verbatim)"
+            if it.metadata.get("degraded"):
+                head += f" | ⚠ degraded:{it.metadata.get('tier', '?')} (no engagement; relevance-filtered)"
             out.append(head)
             out.append(f"  {it.title}")
             out.append(f"  {it.url}")

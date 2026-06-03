@@ -9,6 +9,12 @@ and registering itself at import time:
     from .. import registry
     registry.register(registry.Source("weibo", "zh", fetch, requires_key=True))
 
+A source may instead declare multiple `tiers` (ordered fallback strategies, e.g.
+Reddit's `.json` then `.rss`). The tier runner (lib/tiers.py) tries them by
+quality, highest first, and uses the first that returns results - mirroring
+firecrawl's engine fallback list. A degraded tier (no engagement signal) is
+flagged so scoring/rendering stay honest.
+
 Adding a new source = one module + one register() call + one import line in
 sources/__init__.py. The engine orchestration never changes.
 """
@@ -24,13 +30,39 @@ ENGINE_SOURCES = frozenset({"reddit", "hackernews", "github", "polymarket", "bil
 
 
 @dataclass(frozen=True)
+class Tier:
+    """One fallback strategy for a source.
+
+    fetch: same contract as a source fetch -> fetch(query, window, *, env, depth).
+    quality: higher is tried first; negatives are last-resort tiers (firecrawl
+             convention). degraded tiers should sit below their richer siblings.
+    degraded: True when this tier cannot return a full signal (e.g. no
+              engagement). Surfaced on each item's metadata so scoring/rendering
+              treat it honestly and never fake numbers.
+    label: short id (e.g. "json"/"rss") recorded in item metadata for diagnosis.
+    """
+
+    fetch: Callable
+    quality: int = 100
+    degraded: bool = False
+    label: str = "default"
+
+
+@dataclass(frozen=True)
 class Source:
     name: str
     lang: str                                   # "en" | "zh"
-    fetch: Callable
+    fetch: Optional[Callable] = None            # single-strategy source (back-compat)
+    tiers: tuple = field(default_factory=tuple) # multi-tier source; overrides fetch
     requires_key: bool = False                  # needs cookies/token not yet wired
     implemented: bool = True                    # False for stub placeholders
     aliases: tuple = field(default_factory=tuple)
+
+    def ordered_tiers(self) -> list:
+        """Tiers highest-quality first. A single-fetch source becomes one tier."""
+        if self.tiers:
+            return sorted(self.tiers, key=lambda t: t.quality, reverse=True)
+        return [Tier(fetch=self.fetch, quality=100, degraded=False, label="default")]
 
 
 _REGISTRY: dict[str, Source] = {}

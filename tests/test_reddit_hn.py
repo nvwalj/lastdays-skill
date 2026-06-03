@@ -5,6 +5,7 @@
 
 from datetime import datetime, timezone
 
+from lib import registry, tiers
 from lib.dates import Window
 from lib.sources import hackernews, reddit
 
@@ -35,11 +36,17 @@ def test_reddit_falls_back_to_rss_on_403(monkeypatch):
     def boom(*a, **k):
         raise reddit.http.HTTPError("403", status_code=403)
 
+    # Two posts: one matches "Nvidia", one is off-topic noise that only shares
+    # the word "market" — the RSS tier's relevance gate must drop the latter.
     sample_rss = """<feed>
     <entry><title>Nvidia hits new high</title>
       <link href="https://www.reddit.com/r/stocks/comments/abc123/nvidia_hits_new_high/" />
       <updated>2026-06-02T10:00:00+00:00</updated>
       <author><name>/u/trader</name></author></entry>
+    <entry><title>Flea market find</title>
+      <link href="https://www.reddit.com/r/flashlight/comments/def456/flea_market_find/" />
+      <updated>2026-06-02T09:00:00+00:00</updated>
+      <author><name>/u/collector</name></author></entry>
     <entry><title>The stocks Subreddit</title>
       <link href="https://www.reddit.com/r/stocks/" />
       <updated>2010-01-01T00:00:00+00:00</updated></entry>
@@ -48,15 +55,17 @@ def test_reddit_falls_back_to_rss_on_403(monkeypatch):
     monkeypatch.setattr(reddit.http, "get", boom)
     monkeypatch.setattr(reddit.http, "get_text", lambda *a, **k: sample_rss)
     w = Window(days=7, now=datetime(2026, 6, 2, tzinfo=timezone.utc))
-    items = reddit.fetch("Nvidia", w, env={})
+    items, used = tiers.run_tiers(registry.get("reddit"), "Nvidia", w, env={})
 
-    assert len(items) == 1                       # subreddit card (no /comments/) dropped
+    assert used.label == "rss"                   # json 403 -> fell back to rss tier
+    assert len(items) == 1                        # subreddit card + off-topic noise dropped
     it = items[0]
     assert it.title == "Nvidia hits new high"
     assert it.container == "r/stocks"
     assert it.date == "2026-06-02"
-    assert it.metadata.get("via") == "rss"
-    assert it.engagement == {}                   # RSS carries no engagement; must not be faked
+    assert it.metadata.get("tier") == "rss"
+    assert it.metadata.get("degraded") is True   # framework stamps degraded tier
+    assert it.engagement == {}                    # RSS carries no engagement; must not be faked
     assert it.item_id == "rdabc123"
 
 
@@ -74,7 +83,9 @@ def test_reddit_prefers_json_when_available(monkeypatch):
     monkeypatch.setattr(reddit.http, "get", lambda *a, **k: json_payload)
     monkeypatch.setattr(reddit.http, "get_text", lambda *a, **k: called.update(rss=True) or "")
     w = Window(days=3650, now=datetime(2026, 6, 2, tzinfo=timezone.utc))
-    items = reddit.fetch("stocks", w, env={})
+    items, used = tiers.run_tiers(registry.get("reddit"), "stocks", w, env={})
 
     assert called["rss"] is False                # json worked, RSS never touched
+    assert used.label == "json"
     assert items[0].engagement["score"] == 500   # json keeps real engagement
+    assert not items[0].metadata.get("degraded")  # json tier is not degraded

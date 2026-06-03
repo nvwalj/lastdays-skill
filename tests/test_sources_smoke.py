@@ -18,4 +18,6 @@ def test_en_sources_registered_and_callable():
         src = registry.get(name)
         assert src is not None
         assert src.implemented is True
-        assert callable(src.fetch)
+        # Works for both single-fetch sources and multi-tier sources (reddit).
+        tiers = src.ordered_tiers()
+        assert tiers and all(callable(t.fetch) for t in tiers)

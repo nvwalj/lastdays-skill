@@ -1,12 +1,14 @@
-"""Reddit search (keyless), two-tier.
+"""Reddit search (keyless), two-tier via the registry tier framework.
 
-Tier 0: public ``search.json`` — carries real engagement (score, comments,
-upvote_ratio) but returns HTTP 403 from datacenter IPs.
-Tier 1 (fallback): ``search.rss`` — reachable where ``.json`` is 403, but RSS
-only carries title/link/author/date, NOT engagement. Items from this tier are
-marked ``metadata.via = "rss"`` and carry empty engagement, so scoring and the
-brief can treat them honestly (no invented upvotes). When both tiers fail the
-fetcher returns [] and the agent supplements via WebSearch ``site:reddit.com``.
+Tier "json" (quality 100): public ``search.json`` — carries real engagement
+(score, comments, upvote_ratio) but returns HTTP 403 from datacenter IPs.
+Tier "rss" (quality 40, degraded): ``search.rss`` — reachable where ``.json`` is
+403, but RSS only carries title/link/author/date, NOT engagement. Because it has
+no engagement to rank by, this tier additionally drops titles that don't actually
+match the query (otherwise "Flea market find" leaks in for query "Nvidia" just
+because both contain "market"). Items are flagged degraded so scoring/rendering
+never fake upvotes. If both tiers fail the source yields nothing and the agent
+supplements via WebSearch ``site:reddit.com``.
 """
 
 from __future__ import annotations
@@ -18,9 +20,12 @@ from urllib.parse import quote_plus
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import strip_html, to_int
+from .base import strip_html, title_relevance, to_int
 
 DEPTH = {"quick": 10, "default": 25, "deep": 40}
+# Min title relevance for the engagement-less RSS tier (tuned on real data:
+# keeps "Nvidia hits new high", drops "Flea market find" for query "Nvidia").
+RSS_MIN_RELEVANCE = 0.3
 
 
 def _t_param(days: int) -> str:
@@ -35,7 +40,9 @@ def _t_param(days: int) -> str:
     return "all"
 
 
-def _from_json(query: str, window: Window, limit: int) -> list[Item]:
+def _from_json(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'json' (quality 100): real engagement; 403 from datacenter IPs."""
+    limit = DEPTH.get(depth, 25)
     url = (
         f"https://www.reddit.com/search.json?q={quote_plus(query)}"
         f"&sort=relevance&t={_t_param(window.days)}&limit={limit}&raw_json=1"
@@ -89,7 +96,9 @@ def _tag(entry: str, name: str) -> str:
     return strip_html(m.group(1)).strip() if m else ""
 
 
-def _from_rss(query: str, window: Window, limit: int) -> list[Item]:
+def _from_rss(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'rss' (quality 40, degraded): reachable on 403, but no engagement."""
+    limit = DEPTH.get(depth, 25)
     url = f"https://www.reddit.com/search.rss?q={quote_plus(query)}&sort=new&t={_t_param(window.days)}"
     text = http.get_text(url, timeout=15, accept="application/atom+xml, application/rss+xml, */*")
     if not text:
@@ -102,6 +111,10 @@ def _from_rss(query: str, window: Window, limit: int) -> list[Item]:
             continue
         title = _tag(raw, "title")
         if not title:
+            continue
+        # RSS has no engagement to rank by, so a relevance gate is the only
+        # defense against off-topic noise (e.g. "Flea market find" for "Nvidia").
+        if title_relevance(query, title) < RSS_MIN_RELEVANCE:
             continue
         updated = _tag(raw, "updated") or _tag(raw, "published")
         ts = None
@@ -128,7 +141,6 @@ def _from_rss(query: str, window: Window, limit: int) -> list[Item]:
                 snippet="",
                 relevance=0.55,
                 item_id=f"rd{re.search(r'/comments/([a-z0-9]+)', href).group(1)}" if re.search(r'/comments/([a-z0-9]+)', href) else "",
-                metadata={"via": "rss", "no_engagement": True},
             )
         )
         if len(items) >= limit:
@@ -136,15 +148,14 @@ def _from_rss(query: str, window: Window, limit: int) -> list[Item]:
     return items
 
 
-def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
-    limit = DEPTH.get(depth, 25)
-    try:
-        items = _from_json(query, window, limit)
-        if items:
-            return items
-    except http.HTTPError:
-        pass  # 403 from datacenter IPs — fall through to RSS
-    return _from_rss(query, window, limit)
-
-
-registry.register(registry.Source("reddit", "en", fetch, aliases=("r", "subreddit")))
+registry.register(
+    registry.Source(
+        "reddit",
+        "en",
+        tiers=(
+            registry.Tier(_from_json, quality=100, degraded=False, label="json"),
+            registry.Tier(_from_rss, quality=40, degraded=True, label="rss"),
+        ),
+        aliases=("r", "subreddit"),
+    )
+)

@@ -18,7 +18,7 @@ import datetime
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import to_int
+from .base import title_relevance, to_int
 
 PRIMARY_URL = (
     "https://www.douyin.com/aweme/v1/web/hot/search/list/"
@@ -32,21 +32,8 @@ REFERER = "https://www.douyin.com/"
 
 
 def _relevance(query: str, word: str) -> float:
-    """Topic match for a hot-search word. CJK has no spaces, so combine
-    whitespace-token overlap (works for ASCII/mixed) with a substring check
-    (works for Chinese)."""
-    q = query.strip().lower()
-    w = word.lower()
-    qc = q.replace(" ", "")
-    wc = w.replace(" ", "")
-    if qc and qc in wc:  # exact containment, e.g. 人工智能 in 人工智能写作
-        return 0.75 if len(qc) >= 4 else 0.6
-    q_tokens = {t for t in q.split() if t}
-    if q_tokens:
-        hits = sum(1 for t in q_tokens if t in w)
-        if hits:
-            return min(0.7, 0.3 + 0.4 * hits / len(q_tokens))
-    return 0.0
+    """Topic match for a hot-search word (shared title_relevance helper)."""
+    return title_relevance(query, word)
 
 
 def _word_list(env: dict) -> list:
