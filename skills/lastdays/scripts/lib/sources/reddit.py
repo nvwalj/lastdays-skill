@@ -125,8 +125,12 @@ def _from_rss(query: str, window: Window, *, env: dict, depth: str = "default") 
             date = dt.strftime("%Y-%m-%d")
         except (ValueError, AttributeError):
             pass
-        author = _tag(raw, "name").lstrip("/u/") or None
+        # removeprefix, NOT lstrip: lstrip("/u/") strips any leading / u / chars
+        # and would corrupt "/u/user123" -> "ser123". Guard against a missing
+        # <author> tag (_tag can return "") so one odd entry can't sink the tier.
+        author = (_tag(raw, "name") or "").removeprefix("/u/") or None
         sub = re.search(r"/r/([^/]+)/comments/", href)
+        cid = re.search(r"/comments/([a-z0-9]+)", href)  # compute once
         items.append(
             Item(
                 source="reddit",
@@ -140,7 +144,7 @@ def _from_rss(query: str, window: Window, *, env: dict, depth: str = "default") 
                 engagement={},  # RSS carries no score/comments — leave empty, do not fake
                 snippet="",
                 relevance=0.55,
-                item_id=f"rd{re.search(r'/comments/([a-z0-9]+)', href).group(1)}" if re.search(r'/comments/([a-z0-9]+)', href) else "",
+                item_id=f"rd{cid.group(1)}" if cid else "",
             )
         )
         if len(items) >= limit:

@@ -36,13 +36,15 @@ def test_reddit_falls_back_to_rss_on_403(monkeypatch):
     def boom(*a, **k):
         raise reddit.http.HTTPError("403", status_code=403)
 
-    # Two posts: one matches "Nvidia", one is off-topic noise that only shares
-    # the word "market" — the RSS tier's relevance gate must drop the latter.
+    # Three entries: one matches "Nvidia"; one is off-topic noise that only
+    # shares the word "market" (must be relevance-filtered); one is a subreddit
+    # card (no /comments/, must be skipped). The matching post's author starts
+    # with 'u' to lock in the removeprefix (not lstrip) username fix.
     sample_rss = """<feed>
     <entry><title>Nvidia hits new high</title>
       <link href="https://www.reddit.com/r/stocks/comments/abc123/nvidia_hits_new_high/" />
       <updated>2026-06-02T10:00:00+00:00</updated>
-      <author><name>/u/trader</name></author></entry>
+      <author><name>/u/ultradev</name></author></entry>
     <entry><title>Flea market find</title>
       <link href="https://www.reddit.com/r/flashlight/comments/def456/flea_market_find/" />
       <updated>2026-06-02T09:00:00+00:00</updated>
@@ -63,10 +65,29 @@ def test_reddit_falls_back_to_rss_on_403(monkeypatch):
     assert it.title == "Nvidia hits new high"
     assert it.container == "r/stocks"
     assert it.date == "2026-06-02"
+    assert it.author == "ultradev"               # /u/ prefix stripped, leading 'u' intact
     assert it.metadata.get("tier") == "rss"
     assert it.metadata.get("degraded") is True   # framework stamps degraded tier
     assert it.engagement == {}                    # RSS carries no engagement; must not be faked
     assert it.item_id == "rdabc123"
+
+
+def test_reddit_rss_entry_without_author_does_not_crash(monkeypatch):
+    # An entry missing <author> must not raise (would otherwise sink the tier).
+    def boom(*a, **k):
+        raise reddit.http.HTTPError("403", status_code=403)
+
+    rss = """<feed>
+    <entry><title>Nvidia ships chip</title>
+      <link href="https://www.reddit.com/r/hardware/comments/zzz999/nvidia_ships_chip/" />
+      <updated>2026-06-02T08:00:00+00:00</updated></entry>
+    </feed>"""
+    monkeypatch.setattr(reddit.http, "get", boom)
+    monkeypatch.setattr(reddit.http, "get_text", lambda *a, **k: rss)
+    w = Window(days=7, now=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    items, used = tiers.run_tiers(registry.get("reddit"), "Nvidia", w, env={})
+    assert used.label == "rss" and len(items) == 1
+    assert items[0].author is None               # absent author -> None, no crash
 
 
 def test_reddit_prefers_json_when_available(monkeypatch):
