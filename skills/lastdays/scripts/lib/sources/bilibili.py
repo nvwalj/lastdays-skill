@@ -26,6 +26,7 @@ from .base import strip_html, to_int
 SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
 SEARCH_URL = "https://api.bilibili.com/x/web-interface/search/type"
+WBI_SEARCH_URL = "https://api.bilibili.com/x/web-interface/wbi/search/type"
 REFERER = "https://www.bilibili.com/"
 
 DEPTH = {"quick": 10, "default": 30, "deep": 50}
@@ -126,12 +127,14 @@ def _parse(results: list) -> list[Item]:
     return items
 
 
-def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+def _search(endpoint: str, query: str, depth: str, env: dict) -> list[Item]:
+    """Shared search call against one endpoint. Raises on non-zero code so the
+    tier runner can record the failure and fall through to the next tier."""
     cookie = _get_buvid3(env)
     img_key, sub_key = _get_wbi_keys()
-    # Default (comprehensive) ordering returns results reliably; the engine then
+    # Comprehensive (default) ordering returns results reliably; the engine then
     # window-filters and ranks by recency + engagement. (order=pubdate on the wbi
-    # endpoint was observed to return an empty result set.)
+    # endpoint was observed to return an empty result set / risk-control voucher.)
     params = {
         "search_type": "video",
         "keyword": query,
@@ -140,7 +143,7 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
         "web_location": "1430654",
     }
     signed = sign_wbi(params, img_key, sub_key)
-    url = f"{SEARCH_URL}?{urllib.parse.urlencode(signed)}"
+    url = f"{endpoint}?{urllib.parse.urlencode(signed)}"
     resp = http.get(url, headers={"Referer": REFERER, "Cookie": cookie}, timeout=20, retries=2)
     code = resp.get("code")
     if code != 0:
@@ -148,4 +151,30 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
     return _parse((resp.get("data") or {}).get("result") or [])
 
 
-registry.register(registry.Source("bilibili", "zh", fetch, requires_key=False, implemented=True, aliases=("bili", "b站")))
+def _from_search_type(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'search' (quality 100): the plain search/type endpoint - observed the
+    most reliable anonymously (the wbi/ variant sometimes answers with an empty
+    risk-control voucher instead of results)."""
+    return _search(SEARCH_URL, query, depth, env)
+
+
+def _from_wbi_search_type(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'wbi-search' (quality 60): the wbi/search/type variant as fallback.
+    Same data shape and full engagement when it answers - NOT degraded, just a
+    second route if the primary endpoint errors or comes back empty."""
+    return _search(WBI_SEARCH_URL, query, depth, env)
+
+
+registry.register(
+    registry.Source(
+        "bilibili",
+        "zh",
+        tiers=(
+            registry.Tier(_from_search_type, quality=100, degraded=False, label="search"),
+            registry.Tier(_from_wbi_search_type, quality=60, degraded=False, label="wbi-search"),
+        ),
+        requires_key=False,
+        implemented=True,
+        aliases=("bili", "b站"),
+    )
+)

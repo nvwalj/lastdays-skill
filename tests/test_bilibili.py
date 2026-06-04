@@ -45,7 +45,11 @@ def test_parse_maps_video_results():
     assert it.date == "2024-05-29"
 
 
-def test_bilibili_is_engine_source_now():
+def test_bilibili_is_engine_source_with_two_tiers():
     assert "bilibili" in registry.ENGINE_SOURCES
-    assert registry.get("bili").name == "bilibili"
-    assert registry.get("bilibili").implemented is True
+    src = registry.get("bili")
+    assert src.name == "bilibili" and src.implemented is True
+    ts = src.ordered_tiers()
+    assert [t.label for t in ts] == ["search", "wbi-search"]   # quality order
+    # Both endpoints return full engagement when they answer - neither degraded.
+    assert all(t.degraded is False for t in ts)

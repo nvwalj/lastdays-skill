@@ -53,6 +53,8 @@ def _stamp(items: list, tier: Tier) -> None:
         it.metadata.setdefault("tier", tier.label)
         if tier.degraded:
             it.metadata["degraded"] = True
+            if tier.note:
+                it.metadata.setdefault("degraded_note", tier.note)
 
 
 class TierError(Exception):

@@ -36,23 +36,15 @@ def _relevance(query: str, word: str) -> float:
     return title_relevance(query, word)
 
 
-def _word_list(env: dict) -> list:
-    """Fetch the hot-search board. Try the rich endpoint, fall back to v2."""
-    try:
-        r = http.get(PRIMARY_URL, headers={"Referer": REFERER}, timeout=15, retries=2)
-        wl = (r.get("data") or {}).get("word_list") or r.get("word_list")
-        if wl:
-            return wl
-    except http.HTTPError:
-        pass
-    r = http.get(FALLBACK_URL, headers={"Referer": REFERER}, timeout=15, retries=2)
+def _board(url: str, env: dict) -> list:
+    r = http.get(url, headers={"Referer": REFERER}, timeout=15, retries=2)
     return r.get("word_list") or (r.get("data") or {}).get("word_list") or []
 
 
-def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+def _parse_board(word_list: list, query: str) -> list[Item]:
     today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
     items: list[Item] = []
-    for i, row in enumerate(_word_list(env)):
+    for i, row in enumerate(word_list):
         if not isinstance(row, dict):
             continue
         word = str(row.get("word") or row.get("sentence") or "").strip()
@@ -88,4 +80,30 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
     return items
 
 
-registry.register(registry.Source("douyin", "zh", fetch, requires_key=False, implemented=True, aliases=("dy", "抖音")))
+def _from_aweme(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'aweme' (quality 100): rich board with event_time (real dates)."""
+    return _parse_board(_board(PRIMARY_URL, env), query)
+
+
+def _from_iesdouyin_v2(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'v2' (quality 40, degraded): board has NO timestamps - entries are
+    stamped 'today' (live snapshot), so dates are synthesized, not observed."""
+    return _parse_board(_board(FALLBACK_URL, env), query)
+
+
+registry.register(
+    registry.Source(
+        "douyin",
+        "zh",
+        tiers=(
+            registry.Tier(_from_aweme, quality=100, degraded=False, label="aweme"),
+            registry.Tier(
+                _from_iesdouyin_v2, quality=40, degraded=True, label="v2",
+                note="board has no timestamps; dates synthesized as today",
+            ),
+        ),
+        requires_key=False,
+        implemented=True,
+        aliases=("dy", "抖音"),
+    )
+)

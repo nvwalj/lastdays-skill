@@ -158,7 +158,10 @@ registry.register(
         "en",
         tiers=(
             registry.Tier(_from_json, quality=100, degraded=False, label="json"),
-            registry.Tier(_from_rss, quality=40, degraded=True, label="rss"),
+            registry.Tier(
+                _from_rss, quality=40, degraded=True, label="rss",
+                note="no engagement; relevance-filtered",
+            ),
         ),
         aliases=("r", "subreddit"),
     )

@@ -37,15 +37,18 @@ class Tier:
     quality: higher is tried first; negatives are last-resort tiers (firecrawl
              convention). degraded tiers should sit below their richer siblings.
     degraded: True when this tier cannot return a full signal (e.g. no
-              engagement). Surfaced on each item's metadata so scoring/rendering
-              treat it honestly and never fake numbers.
+              engagement, or synthesized dates). Surfaced on each item's metadata
+              so scoring/rendering treat it honestly and never fake numbers.
     label: short id (e.g. "json"/"rss") recorded in item metadata for diagnosis.
+    note: human-readable description of WHAT is missing on a degraded tier
+          (e.g. "no engagement; relevance-filtered"). Shown in the evidence.
     """
 
     fetch: Callable
     quality: int = 100
     degraded: bool = False
     label: str = "default"
+    note: str = ""
 
 
 @dataclass(frozen=True)
