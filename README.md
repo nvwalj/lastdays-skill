@@ -1,6 +1,8 @@
 # lastdays
 
-**研究一个话题在「最近 N 天」(默认 30 天,可调)的真实讨论 —— 零配置、用订阅账号、不烧 API key。**
+English | [简体中文](README.zh-CN.md)
+
+**Research what people actually said about a topic in the last N days (default 30, configurable) — zero config, runs on your subscription, burns no API keys.**
 
 A lean, subscription-friendly rewrite of the multi-source "last 30 days" research
 skill. A zero-key Python engine pulls **Reddit, Hacker News, GitHub, and
@@ -13,7 +15,7 @@ synthesizes one grounded, cited brief. No API key required — the agent is the 
 
 - **Configurable window.** `--days N` (default 30, range 1–365), strictly enforced.
 - **Subscription-only, zero cost.** Engine uses stdlib + keyless public APIs; reasoning is done by your Claude/Codex subscription. No ScrapeCreators/Brave/OpenRouter keys.
-- **Built to grow into Chinese media.** A source registry with a one-function contract; Weibo / Xiaohongshu / Douyin / Zhihu / Bilibili ship as registered stubs ready to implement.
+- **Built to grow into Chinese media.** A source registry with a one-function contract; Bilibili and Douyin are implemented, Weibo / Xiaohongshu / Zhihu ship as registered stubs ready to implement.
 - **Claude + OpenAI only.** Claude Code plugin (`.claude-plugin/plugin.json`) and OpenAI Codex adapter (`agents/openai.yaml`).
 
 ## Install
@@ -69,8 +71,8 @@ reliable headless brief, use `--provider anthropic` with `ANTHROPIC_API_KEY`, or
 | GitHub | en | ✅ Search API | comments, reactions | keyless (`GITHUB_TOKEN` lifts limit) |
 | Reddit | en | ✅ public `.json` | score, comments | keyless (403 on datacenter IPs → agent supplements) |
 | Polymarket | en | ✅ Gamma | volume | keyless (403 on datacenter IPs → agent supplements) |
-| Bilibili B站 | zh | ✅ wbi search | views, danmaku, favorites | keyless (anonymous buvid3 + wbi md5 sign) |
-| Douyin 抖音 | zh | ✅ hot-search board | hot_value, rank | keyless — trending-board match, not full search |
+| Bilibili | zh | ✅ wbi search | views, danmaku, favorites | keyless (anonymous buvid3 + wbi md5 sign) |
+| Douyin | zh | ✅ hot-search board | hot_value, rank | keyless — trending-board match, not full search |
 | Weibo / Zhihu / Xiaohongshu | zh | ⏳ stub | — | login-walled / anti-bot → agent WebSearch `site:` |
 | Open web / X | any | — | — | agent WebSearch |
 
