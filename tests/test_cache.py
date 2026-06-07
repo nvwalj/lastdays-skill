@@ -92,6 +92,28 @@ def test_get_text_and_json_keys_dont_collide(monkeypatch, tmp_path):
     assert cache.get("GET-TEXT", "https://x/y") == "text body"
 
 
+def test_eviction_removes_stale_files_keeps_fresh(monkeypatch, tmp_path):
+    import os
+    _isolate(monkeypatch, tmp_path)
+    monkeypatch.setattr(cache, "_EVICT_EVERY", 1)  # sweep every put for the test
+    # Seed one fresh and one ancient entry.
+    cache.put("GET", "https://fresh/x", {"a": 1})
+    old = cache._path(cache._key("GET", "https://old/y"))
+    old.write_text('{"t": 0, "v": {"b": 2}}', encoding="utf-8")
+    ancient = time.time() - cache.EVICT_AGE - 100
+    os.utime(old, (ancient, ancient))            # backdate mtime past EVICT_AGE
+    # A put triggers the sweep.
+    cache.put("GET", "https://trigger/z", {"c": 3})
+    assert not old.exists()                       # stale file deleted
+    assert cache.get("GET", "https://fresh/x") == {"a": 1}  # fresh survives
+
+
+def test_eviction_is_amortized_not_every_put(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    # Default cadence: not every put sweeps (cost stays near zero).
+    assert cache._EVICT_EVERY > 1
+
+
 def test_http_post_not_cached(monkeypatch, tmp_path):
     _isolate(monkeypatch, tmp_path)
     calls = {"n": 0}

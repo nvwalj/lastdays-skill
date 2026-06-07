@@ -80,6 +80,38 @@ def put(method: str, url: str, value: Any) -> None:
         tmp.replace(p)
     except (OSError, ValueError, TypeError):
         pass  # value not JSON-serializable, or disk issue — skip caching
+    _maybe_evict()
+
+
+# Sweep stale entries occasionally so the cache dir doesn't grow unbounded.
+# Entries older than this are removed on the rare sweep — generous vs the read
+# TTL so a file that just went read-stale isn't deleted out from under a longer
+# per-call ttl, but the dir still can't accumulate forever.
+EVICT_AGE = 86_400  # 24h
+_EVICT_EVERY = 25    # run a sweep on ~1 in N puts (cheap amortized cost)
+_put_count = 0
+
+
+def _maybe_evict() -> None:
+    """Opportunistically delete cache files older than EVICT_AGE. Runs on a
+    fraction of puts (not every one) so the cost is amortized to near-zero;
+    no background process or extra deps. Best-effort — never raises."""
+    global _put_count
+    _put_count += 1
+    # Sweep on every Nth put (N==1 -> every put). _put_count starts at 1 here,
+    # so the first sweep lands on put #N, keeping early puts cheap.
+    if _put_count % _EVICT_EVERY != 0:
+        return
+    try:
+        cutoff = time.time() - EVICT_AGE
+        for f in _DIR.glob("*.json"):
+            try:
+                if f.stat().st_mtime < cutoff:
+                    f.unlink()
+            except OSError:
+                continue  # vanished or locked — skip
+    except OSError:
+        pass  # dir missing/unreadable — nothing to do
 
 
 def cached(method: str, url: str, fetch: Callable[[], Any], ttl: Optional[int] = None) -> Any:
