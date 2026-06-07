@@ -5,7 +5,7 @@ English | [简体中文](README.zh-CN.md)
 **Research what people actually said about a topic in the last N days (default 30, configurable) — zero config, runs on your subscription, burns no API keys.**
 
 A lean, subscription-friendly rewrite of the multi-source "last 30 days" research
-skill. A zero-key Python engine pulls **Reddit, Hacker News, GitHub, and
+skill. A zero-key Python engine pulls **Reddit, Hacker News, GitHub, Lobsters, and
 Polymarket** with real engagement (upvotes, points, comments, volume) inside a
 strict, configurable date window. The agent host (Claude Code or OpenAI Codex)
 plans the targeting, fills the open-web / X / Chinese layers via WebSearch, and

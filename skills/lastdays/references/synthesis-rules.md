@@ -28,6 +28,7 @@ section each, and a `## Head-to-head` line instead of the `What I learned:` shap
 
 - **Cite inline as `[name](url)`.** Every @handle, r/subreddit, repo, publication, or market is a markdown link at first mention. Never a bare URL; never a plain name when a URL exists. Engine items all carry URLs; WebSearch items carry their own.
 - **Engagement honesty.** Quote real numbers only from engine items (points/upvotes/comments/volume). Web/X/Chinese items gathered via WebSearch have NO engagement numbers — label them "web-sourced" and rank them below comparable engine items. Never fabricate a like/upvote count.
+- **Lead with relevance, not engagement.** Each engine item line shows `rel=` (0–0.9). A high-engagement item with low `rel` is off-topic noise the search loosely recalled — do NOT feature it just because it's popular. Build the brief from high-`rel` items; mention a low-`rel` item only if it genuinely informs the topic. If every item for a source is low-`rel`, treat that source as "nothing on-topic this window" rather than forcing its top item in.
 - **Strict window.** Only cite content dated within the window. If you could not verify a date, say so or drop it.
 - **Empty/blocked sources are stated, not hidden.** If Reddit was blocked or a Chinese platform returned nothing, say it in the coverage line and lower confidence for that angle.
 - **Match the user's language.** Chinese topic or `--lang zh` → write the brief in Chinese. English topic → English.
