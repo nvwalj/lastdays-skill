@@ -65,6 +65,33 @@ def test_http_get_uses_cache(monkeypatch, tmp_path):
     assert calls["n"] == 1  # second call served from cache, no network
 
 
+def test_http_get_text_uses_cache(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    calls = {"n": 0}
+
+    class FakeResp:
+        status = 200
+        def read(self): return b"<rss>feed body</rss>"
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(http.urllib.request, "urlopen",
+                        lambda req, timeout=None: calls.update(n=calls["n"] + 1) or FakeResp())
+    a = http.get_text("https://reddit.com/search.rss?q=python")
+    b = http.get_text("https://reddit.com/search.rss?q=python")
+    assert a == b == "<rss>feed body</rss>"
+    assert calls["n"] == 1  # second call served from the text cache
+
+
+def test_get_text_and_json_keys_dont_collide(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    # Same URL string, different fetch kind -> distinct cache entries.
+    cache.put("GET", "https://x/y", {"json": True})
+    cache.put("GET-TEXT", "https://x/y", "text body")
+    assert cache.get("GET", "https://x/y") == {"json": True}
+    assert cache.get("GET-TEXT", "https://x/y") == "text body"
+
+
 def test_http_post_not_cached(monkeypatch, tmp_path):
     _isolate(monkeypatch, tmp_path)
     calls = {"n": 0}

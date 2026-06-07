@@ -162,7 +162,16 @@ def get_text(
     accept: str = "*/*",
     headers: Optional[dict] = None,
 ) -> Optional[str]:
-    """Fetch decoded text with a browser UA. Returns None on any failure."""
+    """Fetch decoded text with a browser UA. Returns None on any failure.
+
+    Cached like JSON GETs (RSS/HTML endpoints are idempotent), under a distinct
+    GET-TEXT key so it never collides with a JSON GET to the same URL. A warm hit
+    skips the network — the Reddit RSS fallback tier benefits on repeat runs.
+    """
+    hit = cache.get("GET-TEXT", url)
+    if hit is not None:
+        _log(f"CACHE HIT (text) {url}")
+        return hit
     merged = {
         "User-Agent": BROWSER_USER_AGENT,
         "Accept": accept,
@@ -171,7 +180,10 @@ def get_text(
     if headers:
         merged.update(headers)
     try:
-        return request("GET", url, headers=merged, timeout=timeout, retries=retries, raw=True)
+        text = request("GET", url, headers=merged, timeout=timeout, retries=retries, raw=True)
     except HTTPError as e:
         _log(f"get_text failed ({e}): {url}")
         return None
+    if text is not None:
+        cache.put("GET-TEXT", url, text)
+    return text
