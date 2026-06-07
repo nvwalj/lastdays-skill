@@ -28,7 +28,7 @@ def render_compact(report: Report) -> str:
         out.append(f"## {src} ({len(items)})")
         for it in items:
             eng = " ".join(f"{k}={v}" for k, v in (it.engagement or {}).items() if v)
-            head = f"- [{it.item_id or src}] score={it.score:.0f} | {it.date or 'undated'}"
+            head = f"- [{it.item_id or src}] score={it.score:.0f} rel={it.relevance:.2f} | {it.date or 'undated'}"
             if it.container:
                 head += f" | {it.container}"
             if eng:

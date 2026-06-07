@@ -12,7 +12,13 @@ from urllib.parse import urlencode
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import strip_html, to_int
+from .base import strip_html, title_relevance, to_int
+
+# Floor for a hit whose title+repo don't literally match. GitHub's issue search
+# recalls loosely (an issue whose body mentioned the term, unrelated CI/RAG PRs),
+# so — like HN/Polymarket — score by real match with a floor instead of a flat
+# 0.6 that let the relevance gate do nothing.
+NO_MATCH_FLOOR = 0.3
 
 SEARCH_ISSUES = "https://api.github.com/search/issues"
 DEPTH = {"quick": 10, "default": 20, "deep": 40}
@@ -45,11 +51,15 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
             repo = "/".join(ru.split("/")[-2:])
         created = it.get("created_at")
         reactions = (it.get("reactions") or {}).get("total_count", 0)
+        title = it.get("title", "")
+        # Match against title + repo name: the repo often carries the topic word
+        # (orangecoding/fredy is a scraper) that a terse issue title omits.
+        rel = max(NO_MATCH_FLOOR, title_relevance(query, f"{title} {repo.replace('/', ' ')}"))
         items.append(
             Item(
                 source="github",
                 lang="en",
-                title=it.get("title", ""),
+                title=title,
                 url=it.get("html_url", ""),
                 author=(it.get("user") or {}).get("login"),
                 container=repo,
@@ -57,7 +67,7 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
                 ts=None,
                 engagement={"comments": to_int(it.get("comments")), "reactions": to_int(reactions)},
                 snippet=strip_html((it.get("body") or "")[:240]),
-                relevance=0.6,
+                relevance=rel,
                 item_id=f"gh{it.get('number', '')}",
                 metadata={"state": it.get("state"), "is_pr": "pull_request" in it},
             )
