@@ -12,10 +12,23 @@ from urllib.parse import urlencode
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import strip_html, to_int
+from .base import strip_html, title_relevance, to_int
 
 ALGOLIA = "https://hn.algolia.com/api/v1/search_by_date"
 DEPTH = {"quick": 15, "default": 30, "deep": 50}
+# Relevance floor for an Algolia hit whose title shows no literal query-word
+# match. optionalWords lets single weak tokens ("we", "ai") pull in off-topic
+# stories; this floor keeps them present (HN engagement may still matter) but
+# well below titles that actually match, so noise sinks instead of riding
+# upvotes to the top. A real word match scores higher via title_relevance.
+NO_MATCH_FLOOR = 0.25
+
+
+def _relevance(query: str, title: str) -> float:
+    """Blend literal title match with a floor. A title that matches query words
+    scores by coverage (up to ~0.9); one that matches none (only pulled in by
+    optionalWords) gets NO_MATCH_FLOOR so it ranks below genuine matches."""
+    return max(NO_MATCH_FLOOR, title_relevance(query, title))
 
 
 def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
@@ -59,7 +72,7 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
                 ts=ts,
                 engagement={"points": to_int(hit.get("points")), "comments": to_int(hit.get("num_comments"))},
                 snippet=strip_html(hit.get("story_text") or "")[:240],
-                relevance=0.6,
+                relevance=_relevance(query, title),
                 item_id=f"hn{oid}",
                 metadata={"hn_url": f"https://news.ycombinator.com/item?id={oid}"},
             )
