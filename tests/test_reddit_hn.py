@@ -110,3 +110,35 @@ def test_reddit_prefers_json_when_available(monkeypatch):
     assert used.label == "json"
     assert items[0].engagement["score"] == 500   # json keeps real engagement
     assert not items[0].metadata.get("degraded")  # json tier is not degraded
+
+
+def test_hn_pages_long_window_dedups(monkeypatch):
+    """Long windows page-walk past the single-response cap; dups across pages drop."""
+    from datetime import datetime, timezone
+    calls = []
+    def fake_get(url, **k):
+        calls.append(url)
+        page = int(dict(p.split("=") for p in url.split("?")[1].split("&")).get("page", "0"))
+        ts = int(datetime(2026, 6, 6, tzinfo=timezone.utc).timestamp())
+        if page <= 1:  # full pages 0,1 -> keep going
+            base = page * 30
+            return {"hits": [{"objectID": str(base + i), "title": f"AI {base+i}",
+                              "points": 5, "num_comments": 1, "created_at_i": ts} for i in range(30)]}
+        return {"hits": [{"objectID": "5", "title": "AI 5 dup", "points": 5,
+                          "num_comments": 1, "created_at_i": ts}]}  # short page (dup id) -> stop
+    monkeypatch.setattr(hackernews.http, "get", fake_get)
+    w = Window(days=90, now=datetime(2026, 6, 7, tzinfo=timezone.utc))
+    items = hackernews.fetch("AI", w, env={})
+    assert len(calls) == 3                       # 90d -> 3 pages walked
+    assert len(items) == 60                       # 30+30, the dup id "5" on p2 dropped
+    assert len({it.item_id for it in items}) == 60  # all unique
+
+
+def test_hn_short_window_single_page(monkeypatch):
+    calls = []
+    monkeypatch.setattr(hackernews.http, "get",
+                        lambda url, **k: calls.append(url) or {"hits": []})
+    from datetime import datetime, timezone
+    w = Window(days=7, now=datetime(2026, 6, 7, tzinfo=timezone.utc))
+    hackernews.fetch("AI", w, env={})
+    assert len(calls) == 1                        # short window: one request only

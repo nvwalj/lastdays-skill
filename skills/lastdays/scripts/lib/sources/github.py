@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 
-from .. import http, registry
+from .. import dates, http, registry
 from ..dates import Window
 from ..schema import Item
 from .base import strip_html, title_relevance, to_int
@@ -26,12 +26,6 @@ DEPTH = {"quick": 10, "default": 20, "deep": 40}
 
 def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
     per = DEPTH.get(depth, 20)
-    params = {
-        "q": f"{query} created:>={window.from_date}",
-        "sort": "reactions",
-        "order": "desc",
-        "per_page": str(per),
-    }
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -39,12 +33,34 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
     token = (env or {}).get("GITHUB_TOKEN") or (env or {}).get("GH_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    try:
-        resp = http.get(f"{SEARCH_ISSUES}?{urlencode(params)}", headers=headers, timeout=20, retries=2, max_429_retries=1)
-    except http.HTTPError:
-        return []
+    # Page-walk for longer windows. GitHub's unauthenticated search limit is tight
+    # (~10 req/min), so cap pages conservatively (2 keyless / 4 with a token) and
+    # stop on the first error, keeping whatever earlier pages returned.
+    max_pages = 4 if token else 2
+    raw_items: list = []
+    for page in range(1, dates.pages_for_window(window.days, max_pages=max_pages) + 1):
+        params = {
+            "q": f"{query} created:>={window.from_date}",
+            "sort": "reactions",
+            "order": "desc",
+            "per_page": str(per),
+            "page": str(page),
+        }
+        try:
+            resp = http.get(f"{SEARCH_ISSUES}?{urlencode(params)}", headers=headers, timeout=20, retries=2, max_429_retries=1)
+        except http.HTTPError:
+            break  # rate-limited or error; use what we have so far
+        page_items = resp.get("items", [])
+        raw_items.extend(page_items)
+        if len(page_items) < per:  # last page
+            break
     items: list[Item] = []
-    for it in resp.get("items", []):
+    seen_nums: set = set()
+    for it in raw_items:
+        num = it.get("id") or it.get("number")
+        if num in seen_nums:
+            continue
+        seen_nums.add(num)
         repo = ""
         ru = it.get("repository_url", "")
         if ru:

@@ -137,3 +137,17 @@ class Window:
 def get_date_range(days: int = DEFAULT_DAYS):
     w = Window.from_days(days)
     return w.from_date, w.to_date
+
+
+def pages_for_window(days: int, *, base_days: int = 30, max_pages: int = 4) -> int:
+    """How many API pages to fetch for a window of `days`.
+
+    A single API response is capped (HN ~30, GitHub per-page), so a longer window
+    returns the SAME count over a wider span unless we page-walk. Scale pages with
+    the window — roughly one extra page per `base_days` — so "last 180 days" can
+    actually surface more history than "last 7 days", while short windows stay at
+    a single request. Capped at max_pages to respect rate limits (esp. GitHub).
+    """
+    if days <= base_days:
+        return 1
+    return min(max_pages, 1 + (days - 1) // base_days)
