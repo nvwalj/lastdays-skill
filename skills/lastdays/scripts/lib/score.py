@@ -35,6 +35,8 @@ def engagement_raw(source: str, eng: dict) -> float | None:
         return 0.60 * _log(eng.get("points")) + 0.40 * _log(eng.get("comments"))
     if source == "lobsters":
         return 0.60 * _log(eng.get("score")) + 0.40 * _log(eng.get("comments"))
+    if source == "devto":
+        return 0.60 * _log(eng.get("reactions")) + 0.40 * _log(eng.get("comments"))
     if source == "github":
         return 0.60 * _log(eng.get("comments")) + 0.40 * _log(eng.get("reactions"))
     if source == "polymarket":
