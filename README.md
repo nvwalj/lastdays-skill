@@ -68,6 +68,7 @@ reliable headless brief, use `--provider anthropic` with `ANTHROPIC_API_KEY`, or
 | Source | Lang | Engine | Engagement | Status |
 |--------|------|--------|------------|--------|
 | Hacker News | en | ✅ Algolia | points, comments | keyless |
+| Lobsters | en | ✅ hot list | score, comments | keyless — hot-list match (no JSON search), tech-focused |
 | GitHub | en | ✅ Search API | comments, reactions | keyless (`GITHUB_TOKEN` lifts limit) |
 | Reddit | en | ✅ public `.json` | score, comments | keyless (403 on datacenter IPs → agent supplements) |
 | Polymarket | en | ✅ Gamma | volume | keyless (403 on datacenter IPs → agent supplements) |

@@ -5,6 +5,7 @@
 | Source | Lang | Where it runs | Engagement signal | Status |
 |--------|------|---------------|-------------------|--------|
 | Hacker News | en | Python engine (Algolia API) | points, comments | ✅ implemented, keyless |
+| Lobsters | en | Python engine (hottest.json + is_on_topic) | score, comments | ✅ implemented, keyless — hot-list match, not full search |
 | GitHub | en | Python engine (Search API) | comments, reactions | ✅ implemented, keyless* |
 | Reddit | en | Python engine (`.json`, RSS fallback) | score, comments (json only) | ✅ implemented, keyless** |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
