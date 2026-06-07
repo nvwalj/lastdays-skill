@@ -16,6 +16,8 @@ import urllib.request
 from typing import Any, Optional, Union
 from urllib.parse import urlencode
 
+from . import cache
+
 DEFAULT_TIMEOUT = 30
 MAX_RETRIES = 4
 MAX_429_RETRIES = 2
@@ -73,6 +75,16 @@ def request(
         data = json.dumps(json_data).encode("utf-8")
         headers.setdefault("Content-Type", "application/json")
 
+    # Cache only idempotent JSON GETs (no body). POSTs are LLM calls (must not be
+    # cached); raw responses are handled by get_text's own caching opt-in. A warm
+    # hit skips the network entirely — the main lever on repeat/vs-run latency.
+    cacheable = method.upper() == "GET" and data is None and not raw
+    if cacheable:
+        hit = cache.get("GET", url)
+        if hit is not None:
+            _log(f"CACHE HIT {url}")
+            return hit
+
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     _log(f"{method} {url}")
 
@@ -85,7 +97,10 @@ def request(
                 body = resp.read().decode("utf-8", errors="replace")
                 if raw:
                     return body
-                return json.loads(body) if body else {}
+                parsed = json.loads(body) if body else {}
+                if cacheable:
+                    cache.put("GET", url, parsed)
+                return parsed
         except urllib.error.HTTPError as e:
             body = None
             try:

@@ -25,6 +25,16 @@ def test_window_dates():
     assert w.from_date == "2026-05-23"
 
 
+def test_cutoff_day_ts_is_day_quantized_and_cache_stable():
+    # Same day, different seconds -> identical cutoff_day_ts, so request URLs
+    # built from it are stable and the HTTP cache can hit.
+    a = Window(days=7, now=datetime(2026, 5, 30, 9, 15, 3, tzinfo=timezone.utc))
+    b = Window(days=7, now=datetime(2026, 5, 30, 9, 15, 59, tzinfo=timezone.utc))
+    assert a.cutoff_day_ts == b.cutoff_day_ts
+    # It is midnight UTC of the cutoff day (2026-05-23).
+    assert a.cutoff_day_ts == int(datetime(2026, 5, 23, tzinfo=timezone.utc).timestamp())
+
+
 def test_window_contains_strict():
     w = Window(days=7, now=datetime(2026, 5, 30, 12, 0, tzinfo=timezone.utc))
     in_ts = datetime(2026, 5, 25, tzinfo=timezone.utc).timestamp()

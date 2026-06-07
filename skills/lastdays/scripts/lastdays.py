@@ -157,10 +157,13 @@ def main(argv=None) -> int:
         action="store_true",
         help="also emit a brief via a reasoning provider (headless/cron; subscription-first, API key optional)",
     )
+    ap.add_argument("--refresh", action="store_true", help="bypass the HTTP cache and fetch fresh")
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--diagnose", action="store_true", help="list sources + auth status, then exit")
     args = ap.parse_args(argv)
 
+    if args.refresh:
+        os.environ["LASTDAYS_NO_CACHE"] = "1"
     if args.debug:
         http_mod.set_debug(True)
     if args.diagnose:

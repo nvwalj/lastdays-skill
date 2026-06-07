@@ -33,7 +33,9 @@ def _relevance(query: str, title: str) -> float:
 
 def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
     count = DEPTH.get(depth, 30)
-    from_ts = int(window.cutoff.timestamp())
+    # Day-quantized so the URL is stable within a day -> HTTP cache can hit.
+    # (A second-precise cutoff made every request unique and defeated caching.)
+    from_ts = window.cutoff_day_ts
     params = {
         "query": query,
         "tags": "story",

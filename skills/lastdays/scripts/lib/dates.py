@@ -92,6 +92,16 @@ class Window:
         return self.now - timedelta(days=self.days)
 
     @property
+    def cutoff_day_ts(self) -> int:
+        """Unix ts of the cutoff DAY's 00:00 UTC. Day-quantized on purpose: a
+        second-precise cutoff makes every request URL unique and defeats the
+        HTTP cache. 'Last N days' is a day-grained concept, so this loses no
+        meaningful precision while letting same-day repeat queries cache-hit."""
+        c = self.cutoff
+        day = datetime(c.year, c.month, c.day, tzinfo=timezone.utc)
+        return int(day.timestamp())
+
+    @property
     def from_date(self) -> str:
         return self.cutoff.strftime("%Y-%m-%d")
 
