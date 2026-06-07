@@ -28,6 +28,26 @@ def test_score_and_rank_orders_by_signal():
     assert ranked[0].score > ranked[1].score
 
 
+def test_relevance_gate_keeps_offtopic_viral_below_relevant():
+    # A high-engagement off-topic item must NOT outrank a genuinely relevant one.
+    w = Window(days=7, now=datetime(2026, 6, 7, tzinfo=timezone.utc))
+    viral_noise = Item(
+        source="hackernews", lang="en", title="viral but off topic", url="n",
+        date="2026-06-06", ts=_ts(2026, 6, 6),
+        engagement={"points": 400, "comments": 200}, relevance=0.25,
+    )
+    quiet_relevant = Item(
+        source="hackernews", lang="en", title="exactly what you searched", url="r",
+        date="2026-06-06", ts=_ts(2026, 6, 6),
+        engagement={"points": 40, "comments": 15}, relevance=0.90,
+    )
+    items = [viral_noise, quiet_relevant]
+    score.score_items(items, w)
+    ranked = score.rank(items)
+    assert ranked[0].url == "r"                  # relevant wins despite 10x less engagement
+    assert ranked[0].score > ranked[1].score
+
+
 def test_engagement_raw_unknown_is_none():
     assert score.engagement_raw("hackernews", {}) is None
     assert score.engagement_raw("github", {"comments": 3}) is not None
