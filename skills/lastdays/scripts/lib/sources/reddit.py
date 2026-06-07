@@ -20,12 +20,9 @@ from urllib.parse import quote_plus
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import strip_html, title_relevance, to_int
+from .base import is_on_topic, strip_html, to_int
 
 DEPTH = {"quick": 10, "default": 25, "deep": 40}
-# Min title relevance for the engagement-less RSS tier (tuned on real data:
-# keeps "Nvidia hits new high", drops "Flea market find" for query "Nvidia").
-RSS_MIN_RELEVANCE = 0.3
 
 
 def _t_param(days: int) -> str:
@@ -112,9 +109,9 @@ def _from_rss(query: str, window: Window, *, env: dict, depth: str = "default") 
         title = _tag(raw, "title")
         if not title:
             continue
-        # RSS has no engagement to rank by, so a relevance gate is the only
-        # defense against off-topic noise (e.g. "Flea market find" for "Nvidia").
-        if title_relevance(query, title) < RSS_MIN_RELEVANCE:
+        # RSS has no engagement to rank by, so a topic gate is the only defense
+        # against off-topic noise (e.g. "Flea market find" for "Nvidia").
+        if not is_on_topic(query, title):
             continue
         updated = _tag(raw, "updated") or _tag(raw, "published")
         ts = None

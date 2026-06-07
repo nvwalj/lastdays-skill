@@ -5,16 +5,15 @@ from __future__ import annotations
 import html as _html
 import re
 
-# Words too generic to count as a topic match on their own (avoids "AI" or
-# "market" alone qualifying an off-topic title).
+# Pure grammatical stopwords only. Domain/category words (market, stock, news,
+# rate, ...) are deliberately NOT listed: blacklisting them is fragile (it
+# misfires when the "category" word IS the query's core, e.g. "stock" in "US
+# stock market"). Instead the coverage curve below does the work — a title that
+# matches only one weak token of a multi-word query scores in the low partial
+# band, while matching every token scores high.
 _STOPWORDS = frozenset({
     "the", "a", "an", "of", "for", "and", "or", "to", "in", "on", "at", "is",
-    "are", "vs", "us", "my", "how", "what", "why", "new", "best", "top",
-    # Broad category words that, alone, do not make a title on-topic. Keeps
-    # "market" from qualifying "Flea market find" for query "US stock market"
-    # while the specific token ("stock") still must appear.
-    "market", "stock", "stocks", "news", "price", "update", "today", "app",
-    "ai", "tech", "data", "guide", "review", "list",
+    "are", "vs", "us", "my", "how", "what", "why",
 })
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -37,45 +36,67 @@ def strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def title_relevance(query: str, text: str) -> float:
-    """How well `text` matches `query`. 0..~0.9.
+_CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
 
-    ASCII and CJK need different matching because CJK has no word spaces:
-    - CJK: substring containment (e.g. 人工智能 inside 人工智能写作).
-    - ASCII: WHOLE-WORD matching of the query's meaningful (non-stopword) tokens,
-      scored by the fraction covered. Word-boundary matching is deliberate so
-      "AI" does not match "stainless" and "market" alone does not let
-      "Flea market find" through for query "US stock market".
-    Shared by the Douyin source and the Reddit RSS fallback tier (which has no
-    engagement to rank by and relies on this to suppress off-topic noise).
-    """
+
+def _query_hits(query: str, text: str):
+    """(unique meaningful query tokens, how many appear whole-word in text).
+    Returns (None, 0) for the CJK path (handled separately by callers)."""
     q = (query or "").strip().lower()
     w = (text or "").lower()
     if not q or not w:
-        return 0.0
-
-    # CJK containment path (covers Chinese/Japanese topics with no word breaks).
-    qc = q.replace(" ", "")
-    if re.search(r"[぀-ヿ㐀-鿿]", qc) and qc in w.replace(" ", ""):
-        return 0.85 if len(qc) >= 4 else 0.6
-
-    # ASCII whole-word path. Meaningful tokens only; require real coverage.
-    q_tokens = [t for t in _WORD_RE.findall(q) if t not in _STOPWORDS and len(t) > 1]
-    if not q_tokens:
-        q_tokens = _WORD_RE.findall(q)  # query is all stopwords -> fall back to all
-    if not q_tokens:
-        return 0.0
+        return [], 0
+    toks = [t for t in _WORD_RE.findall(q) if t not in _STOPWORDS and len(t) > 1]
+    if not toks:
+        toks = _WORD_RE.findall(q)  # query was all stopwords -> use everything
+    uniq = list(dict.fromkeys(toks))
     title_words = set(_WORD_RE.findall(w))
-    # De-dup query tokens so a repeated word can't inflate coverage.
-    uniq = list(dict.fromkeys(q_tokens))
     hits = sum(1 for t in uniq if t in title_words)  # whole-word, not substring
-    if not hits:
+    return uniq, hits
+
+
+def _cjk_match(query: str, text: str) -> bool:
+    qc = (query or "").strip().lower().replace(" ", "")
+    return bool(_CJK_RE.search(qc)) and qc in (text or "").lower().replace(" ", "")
+
+
+def is_on_topic(query: str, text: str) -> bool:
+    """Boolean topic gate: does `text` actually discuss `query`?
+
+    Rules (no fragile domain stopword list — coverage does the work):
+    - CJK: substring containment.
+    - 1 meaningful token: one whole-word hit is enough ("Nvidia").
+    - 2 tokens: BOTH must hit (so "Tesla stock" is not satisfied by "Ford stock").
+    - 3+ tokens: at least 2 must hit (so "US stock market" is not satisfied by
+      "market" alone in "Flea market find", but is by "stock market crash").
+    Used as the hard gate by the Reddit RSS tier and the Douyin board, which have
+    no engagement to fall back on and must drop off-topic noise outright.
+    """
+    if not query or not text:
+        return False
+    if _CJK_RE.search(query.replace(" ", "")):
+        return _cjk_match(query, text)
+    uniq, hits = _query_hits(query, text)
+    if not uniq or hits == 0:
+        return False
+    if len(uniq) <= 1:
+        return True
+    if len(uniq) == 2:
+        return hits == 2
+    return hits >= 2
+
+
+def title_relevance(query: str, text: str) -> float:
+    """Continuous 0..0.9 relevance for RANKING (not gating — use is_on_topic to
+    gate). Full coverage scores 0.9; partial coverage scales down so a one-token
+    match of a multi-word query can't masquerade as a full match. CJK containment
+    scores 0.85. Used by HN scoring and the Douyin hot-value blend.
+    """
+    if _CJK_RE.search((query or "").replace(" ", "")):
+        return 0.85 if _cjk_match(query, text) else 0.0
+    uniq, hits = _query_hits(query, text)
+    if not uniq or hits == 0:
         return 0.0
-    # Require real coverage: a multi-word query must match at least half its
-    # meaningful tokens, so "US stock market" is NOT satisfied by "market" alone
-    # in "Flea market find" (1/3). A single-token query passes on its one hit.
-    needed = (len(uniq) + 1) // 2  # ceil(half); ==1 for single-token queries
-    if hits < needed:
-        return 0.0
-    coverage = hits / len(uniq)
-    return round(min(0.9, 0.25 + 0.65 * coverage), 3)
+    if hits == len(uniq):
+        return 0.9
+    return round(0.2 + 0.4 * (hits / len(uniq)), 3)  # partial: below a full match

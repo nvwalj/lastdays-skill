@@ -14,8 +14,10 @@ def test_relevance_floor_for_nonmatching_title():
 
 
 def test_relevance_high_for_matching_title():
-    r = _relevance("web scraping anti-bot", "A fast web scraping framework")
-    assert r > NO_MATCH_FLOOR + 0.2          # real match ranks clearly above noise
+    full = _relevance("web scraping", "A fast web scraping framework")  # both tokens
+    assert full == 0.9                       # full match scores high
+    partial = _relevance("web scraping anti-bot", "A fast web scraping framework")
+    assert NO_MATCH_FLOOR < partial < full   # partial ranks above noise, below full
 
 
 def test_optional_words_only_for_multiword(monkeypatch):

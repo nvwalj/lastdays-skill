@@ -18,7 +18,7 @@ import datetime
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import title_relevance, to_int
+from .base import is_on_topic, title_relevance, to_int
 
 PRIMARY_URL = (
     "https://www.douyin.com/aweme/v1/web/hot/search/list/"
@@ -50,9 +50,9 @@ def _parse_board(word_list: list, query: str) -> list[Item]:
         word = str(row.get("word") or row.get("sentence") or "").strip()
         if not word:
             continue
-        rel = _relevance(query, word)
-        if rel < 0.4:  # keep only entries on-topic for the query
+        if not is_on_topic(query, word):  # keep only entries on-topic for the query
             continue
+        rel = _relevance(query, word)  # continuous score for ranking
         et = row.get("event_time")
         ts = float(et) if et else None
         date = (
