@@ -142,7 +142,12 @@ def _search(endpoint: str, query: str, depth: str, env: dict) -> list[Item]:
         "page_size": str(DEPTH.get(depth, 30)),
         "web_location": "1430654",
     }
-    signed = sign_wbi(params, img_key, sub_key)
+    # Day-quantized wts: a per-second timestamp makes the signed URL unique on
+    # every call, so the HTTP cache could never hit (same bug class as the HN
+    # cutoff fixed earlier). B站 accepts any recent wts, so pinning it to the
+    # start of the UTC day keeps the URL stable within a day -> cache hits.
+    day_wts = int(time.time() // 86400 * 86400)
+    signed = sign_wbi(params, img_key, sub_key, wts=day_wts)
     url = f"{endpoint}?{urllib.parse.urlencode(signed)}"
     resp = http.get(url, headers={"Referer": REFERER, "Cookie": cookie}, timeout=20, retries=2)
     code = resp.get("code")

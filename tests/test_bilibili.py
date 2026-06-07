@@ -53,3 +53,22 @@ def test_bilibili_is_engine_source_with_two_tiers():
     assert [t.label for t in ts] == ["search", "wbi-search"]   # quality order
     # Both endpoints return full engagement when they answer - neither degraded.
     assert all(t.degraded is False for t in ts)
+
+
+def test_search_url_stable_within_day_for_cache(monkeypatch):
+    """The signed search URL must be identical across calls in the same day, or
+    the HTTP cache can never hit (the wts-per-second bug)."""
+    from lib.dates import Window
+    from datetime import datetime, timezone
+    seen = []
+    monkeypatch.setattr(bilibili, "_get_buvid3", lambda env: "buvid3=x")
+    monkeypatch.setattr(bilibili, "_get_wbi_keys", lambda: ("a" * 32, "b" * 32))
+    def fake_get(url, **k):
+        seen.append(url)
+        return {"code": 0, "data": {"result": []}}
+    monkeypatch.setattr(bilibili.http, "get", fake_get)
+    w = Window.from_days(7)
+    bilibili._search(bilibili.SEARCH_URL, "游戏", "default", {})
+    bilibili._search(bilibili.SEARCH_URL, "游戏", "default", {})
+    assert seen[0] == seen[1]              # same wts/w_rid -> cacheable
+    assert "wts=" in seen[0]
