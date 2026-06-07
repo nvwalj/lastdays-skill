@@ -128,3 +128,29 @@ def test_http_post_not_cached(monkeypatch, tmp_path):
     http.post("https://api.example/x", {"body": 1})
     http.post("https://api.example/x", {"body": 1})
     assert calls["n"] == 2  # POST is never cached (LLM calls etc.)
+
+
+def test_paged_requests_are_cached(monkeypatch, tmp_path):
+    """Long-window page-walk must cache every page URL, so a warm repeat does
+    zero network (guards the paging x cache interaction added in round 17)."""
+    _isolate(monkeypatch, tmp_path)
+    net = {"n": 0}
+
+    class FakeResp:
+        status = 200
+        def __init__(self, body): self._b = body
+        def read(self): return self._b
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_urlopen(req, timeout=None):
+        net["n"] += 1
+        # distinct body per page so each URL is a distinct cache entry
+        return FakeResp(b'{"hits": [{"objectID": "x"}]}')
+
+    monkeypatch.setattr(http.urllib.request, "urlopen", fake_urlopen)
+    # Two distinct page URLs, fetched twice each.
+    for _ in range(2):
+        http.get("https://api.example/search?q=ai&page=0")
+        http.get("https://api.example/search?q=ai&page=1")
+    assert net["n"] == 2  # 2 unique pages hit once each; second round all cached
