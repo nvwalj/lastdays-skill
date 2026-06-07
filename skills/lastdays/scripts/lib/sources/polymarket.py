@@ -13,9 +13,14 @@ from urllib.parse import urlencode
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
+from .base import title_relevance
 
 GAMMA = "https://gamma-api.polymarket.com/public-search"
 DEPTH = {"quick": 5, "default": 12, "deep": 20}
+# Floor for a market whose title doesn't literally match the query (Gamma search
+# can return loosely-related markets). Keeps it present — volume still ranks it —
+# but below markets that actually match. Same pattern as the HN source.
+NO_MATCH_FLOOR = 0.3
 
 
 def _outcomes(market: dict) -> list[tuple]:
@@ -58,17 +63,18 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
         except (TypeError, ValueError):
             vol = 0.0
         slug = ev.get("slug", "")
+        title = ev.get("title", "")
         items.append(
             Item(
                 source="polymarket",
                 lang="en",
-                title=ev.get("title", ""),
+                title=title,
                 url=f"https://polymarket.com/event/{slug}" if slug else "https://polymarket.com",
                 date=updated[:10] if updated else None,
                 ts=None,
                 engagement={"volume": round(vol)},
                 snippet=", ".join(f"{n} {round(p * 100)}%" for n, p in outs),
-                relevance=0.55,
+                relevance=max(NO_MATCH_FLOOR, title_relevance(query, title)),
                 item_id=f"pm{ev.get('id', '')}",
                 metadata={"outcomes": outs},
             )
