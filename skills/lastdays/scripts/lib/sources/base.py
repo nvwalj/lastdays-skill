@@ -37,6 +37,26 @@ def strip_html(text: str) -> str:
 
 
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
+_CJK_CHAR = re.compile(r"[一-鿿぀-ヿ]")
+# CJK queries match too rarely as a whole string ("开源大模型" is almost never
+# in a title verbatim; real titles say "大模型开源" or "开源模型"). Score by
+# character-bigram overlap instead — the standard approach for space-less CJK.
+CJK_ON_TOPIC_COVER = 0.5  # >= half the query bigrams present -> on topic
+
+
+def _cjk_bigrams(s: str) -> set:
+    chars = "".join(c for c in (s or "") if _CJK_CHAR.match(c))
+    if len(chars) < 2:
+        return {chars} if chars else set()
+    return {chars[i:i + 2] for i in range(len(chars) - 1)}
+
+
+def _cjk_coverage(query: str, text: str) -> float:
+    """Fraction of the query's CJK bigrams present in text (0..1)."""
+    qb = _cjk_bigrams(query)
+    if not qb:
+        return 0.0
+    return len(qb & _cjk_bigrams(text)) / len(qb)
 
 
 def _query_hits(query: str, text: str):
@@ -56,8 +76,8 @@ def _query_hits(query: str, text: str):
 
 
 def _cjk_match(query: str, text: str) -> bool:
-    qc = (query or "").strip().lower().replace(" ", "")
-    return bool(_CJK_RE.search(qc)) and qc in (text or "").lower().replace(" ", "")
+    # On-topic if enough query bigrams appear (not the whole string verbatim).
+    return _cjk_coverage(query, text) >= CJK_ON_TOPIC_COVER
 
 
 def is_on_topic(query: str, text: str) -> bool:
@@ -88,12 +108,16 @@ def is_on_topic(query: str, text: str) -> bool:
 
 def title_relevance(query: str, text: str) -> float:
     """Continuous 0..0.9 relevance for RANKING (not gating — use is_on_topic to
-    gate). Full coverage scores 0.9; partial coverage scales down so a one-token
-    match of a multi-word query can't masquerade as a full match. CJK containment
-    scores 0.85. Used by HN scoring and the Douyin hot-value blend.
+    gate). Full coverage scores 0.9; partial scales down so a weak match can't
+    masquerade as a full one. CJK is scored by bigram-overlap coverage (full
+    overlap 0.9, partial scaled) since space-less CJK rarely matches verbatim.
+    Used by HN scoring and the Douyin hot-value blend.
     """
     if _CJK_RE.search((query or "").replace(" ", "")):
-        return 0.85 if _cjk_match(query, text) else 0.0
+        cover = _cjk_coverage(query, text)
+        if cover <= 0:
+            return 0.0
+        return 0.9 if cover >= 0.999 else round(0.2 + 0.7 * cover, 3)
     uniq, hits = _query_hits(query, text)
     if not uniq or hits == 0:
         return 0.0

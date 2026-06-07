@@ -58,3 +58,16 @@ def test_empty_inputs():
     assert not is_on_topic("", "anything")
     assert not is_on_topic("query", "")
     assert tr("", "anything") == 0.0
+
+
+def test_cjk_bigram_matching_not_whole_string():
+    # "开源大模型" must match titles that share its words, not only verbatim ones.
+    from lib.sources.base import title_relevance as tr, is_on_topic as ot
+    assert tr("开源大模型", "开源大模型横评") == 0.9            # full
+    assert ot("开源大模型", "DeepSeek 大模型开源发布")          # reordered words -> on topic
+    assert tr("开源大模型", "DeepSeek 大模型开源发布") > 0.5
+    assert ot("开源大模型", "国产开源模型最新进展")             # 开源+模型 -> on topic
+    assert not ot("开源大模型", "终端触摸手势优化")             # unrelated -> off
+    assert tr("开源大模型", "终端触摸手势优化") == 0.0
+    # Partial CJK ranks below a full match.
+    assert tr("开源大模型", "Qwen3 模型评测") < tr("开源大模型", "开源大模型横评")
