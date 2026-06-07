@@ -46,6 +46,10 @@ _LAYER_LABELS = {
     "web": "Open web articles/blogs - WebSearch the topic with a recency filter",
     "x": "X / Twitter discussion - WebSearch site:x.com",
 }
+# Total wall-clock budget for all engine sources combined. A wedged source is
+# abandoned (recorded as a timeout error) rather than hanging the whole run.
+# Sized above a normal single-source fetch+retry (~20s) but well below "forever".
+ENGINE_DEADLINE = 45
 
 
 def _now_iso() -> str:
@@ -87,16 +91,35 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
 
     raw: dict[str, list] = {}
     if engine_targets:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(engine_targets))) as ex:
-            futs = {ex.submit(_fetch, n): n for n in engine_targets}
-            for fut in concurrent.futures.as_completed(futs):
+        # NOT a `with` block: the executor context manager joins ALL threads on
+        # exit, which would re-introduce the hang we're guarding against (a wedged
+        # source's thread is still running). Manage it explicitly and shut down
+        # without waiting so a stalled source can't hold the run hostage.
+        ex = concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(engine_targets)))
+        futs = {ex.submit(_fetch, n): n for n in engine_targets}
+        pending = set(futs)
+        try:
+            # Overall deadline: a single wedged source (network stall, retry/
+            # backoff chain) must not hang the whole run. as_completed's timeout
+            # is the TOTAL budget — anything not done by then is abandoned. (The
+            # old per-future result(timeout=60) never fired: as_completed only
+            # yields already-finished futures.)
+            for fut in concurrent.futures.as_completed(futs, timeout=ENGINE_DEADLINE):
+                pending.discard(fut)
                 name = futs[fut]
                 try:
-                    _, items = fut.result(timeout=60)
+                    _, items = fut.result()
                     raw[name] = items
                 except Exception as e:  # noqa: BLE001  one source must never kill the run
                     report.errors_by_source[name] = f"{type(e).__name__}: {e}"
                     raw[name] = []
+        except concurrent.futures.TimeoutError:
+            for fut in pending:  # sources that blew the deadline
+                name = futs[fut]
+                fut.cancel()
+                report.errors_by_source[name] = f"timeout after {ENGINE_DEADLINE}s"
+                raw[name] = []
+        ex.shutdown(wait=False)  # don't block on the wedged thread(s)
 
     # per-source: strict window filter -> score -> rank
     for name in engine_targets:
