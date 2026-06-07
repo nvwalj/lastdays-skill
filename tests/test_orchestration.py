@@ -11,9 +11,10 @@ from lib.schema import Item
 
 def _items(name):
     # Stamp a recent date so the strict window filter keeps the item (the
-    # orchestration is what's under test, not date filtering).
+    # orchestration is what's under test, not date filtering). Per-source unique
+    # title/url so cross-source dedupe doesn't collapse them.
     ts = datetime.now(timezone.utc).timestamp()
-    return [Item(source=name, lang="en", title="t", url=f"https://e/{name}",
+    return [Item(source=name, lang="en", title=f"{name} story", url=f"https://e/{name}",
                  date=datetime.now(timezone.utc).strftime("%Y-%m-%d"), ts=ts)]
 
 

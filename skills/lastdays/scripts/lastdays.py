@@ -127,18 +127,31 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
         score.score_items(items, window)
         report.items_by_source[name] = score.rank(items)
 
-    # cross-source URL dedupe (preserve per-source grouping)
-    seen: set[str] = set()
+    # Cross-source dedupe by canonical URL OR normalized title, preserving the
+    # per-source grouping. A higher-scored copy wins (e.g. the HN original beats
+    # a low-score Reddit reshare of the same story), so the survivor is dropped
+    # from the weaker source's list. Highest-score-first ensures that ordering.
+    seen_url: set[str] = set()
+    seen_title: set[str] = set()
+    ranked = sorted(
+        (it for name in engine_targets for it in report.items_by_source.get(name, [])),
+        key=lambda i: (i.score, i.engagement_total()),
+        reverse=True,
+    )
+    survivors: set[int] = set()
+    for it in ranked:
+        cu, nt = normalize.dedupe_keys(it)
+        if (cu and cu in seen_url) or (nt and nt in seen_title):
+            continue
+        if cu:
+            seen_url.add(cu)
+        if nt:
+            seen_title.add(nt)
+        survivors.add(id(it))
     for name in engine_targets:
-        kept = []
-        for it in report.items_by_source.get(name, []):
-            key = normalize.canonical_url(it.url)
-            if key and key in seen:
-                continue
-            if key:
-                seen.add(key)
-            kept.append(it)
-        report.items_by_source[name] = kept
+        report.items_by_source[name] = [
+            it for it in report.items_by_source.get(name, []) if id(it) in survivors
+        ]
 
     # layers the engine does not cover -> route to the agent's WebSearch
     for name in web_layers:
