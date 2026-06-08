@@ -21,7 +21,7 @@ import urllib.parse
 from .. import http, registry
 from ..dates import Window
 from ..schema import Item
-from .base import strip_html, to_int
+from .base import is_on_topic, strip_html, title_relevance, to_int
 
 SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
@@ -88,13 +88,19 @@ def _get_wbi_keys() -> tuple[str, str]:
     return _CACHE["wbi"]
 
 
-def _parse(results: list) -> list[Item]:
+def _parse(results: list, query: str) -> list[Item]:
     items: list[Item] = []
     for v in results or []:
         if v.get("type") != "video":
             continue
         title = _clean_title(v.get("title", ""))
         if not title:
+            continue
+        # B站 search fuzzes short CJK queries (泰瑞达/Teradyne pulls in "瑞达" game
+        # clips & 瑞达利欧/Ray-Dalio videos), so gate every hit on the engine's own
+        # CJK-aware relevance rather than trusting B站 recall: drop off-topic, then
+        # score survivors by real match instead of a flat 0.6.
+        if not is_on_topic(query, title):
             continue
         bvid = v.get("bvid", "")
         pub = v.get("pubdate")
@@ -119,7 +125,7 @@ def _parse(results: list) -> list[Item]:
                     "favorites": to_int(v.get("favorites")),
                 },
                 snippet=_clean_title(v.get("description", ""))[:240],
-                relevance=0.6,
+                relevance=max(0.3, title_relevance(query, title)),
                 item_id=f"bv{bvid}",
                 metadata={"duration": v.get("duration")},
             )
@@ -153,7 +159,7 @@ def _search(endpoint: str, query: str, depth: str, env: dict) -> list[Item]:
     code = resp.get("code")
     if code != 0:
         raise http.HTTPError(f"bilibili code {code}: {resp.get('message')}")
-    return _parse((resp.get("data") or {}).get("result") or [])
+    return _parse((resp.get("data") or {}).get("result") or [], query)
 
 
 def _from_search_type(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:

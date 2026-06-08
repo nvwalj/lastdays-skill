@@ -35,7 +35,7 @@ def test_parse_maps_video_results():
         },
         {"type": "user", "uname": "ignored"},
     ]
-    items = bilibili._parse(results)
+    items = bilibili._parse(results, "工具盘点")
     assert len(items) == 1
     it = items[0]
     assert it.source == "bilibili" and it.lang == "zh"
@@ -43,6 +43,24 @@ def test_parse_maps_video_results():
     assert it.url == "https://www.bilibili.com/video/BV1xx"
     assert it.engagement == {"views": 12345, "danmaku": 678, "favorites": 90}
     assert it.date == "2024-05-29"
+    assert it.relevance == 0.9  # real title_relevance (full CJK match), not a flat 0.6
+
+
+def test_parse_gates_offtopic_fuzzy_match():
+    # B站 search fuzzes the 2-bigram query 泰瑞达 (Teradyne) into "瑞达" game clips
+    # and 瑞达利欧 (Ray Dalio) videos. The engine must drop them and keep only the
+    # real Teradyne video. Regression for the 2026-06-08 --lang both finding.
+    results = [
+        {"type": "video", "bvid": "BV1on", "title": "泰瑞达 Q1 财报点评",
+         "pubdate": 1716950400, "play": 100, "video_review": 1, "favorites": 1},
+        {"type": "video", "bvid": "BV1off", "title": "【刺客信条】瑞达每日精选",
+         "pubdate": 1716950400, "play": 9999, "video_review": 1, "favorites": 1},
+        {"type": "video", "bvid": "BV1off2", "title": "瑞达利欧谈债务危机",
+         "pubdate": 1716950400, "play": 8888, "video_review": 1, "favorites": 1},
+    ]
+    items = bilibili._parse(results, "泰瑞达")
+    assert [it.item_id for it in items] == ["bvBV1on"]  # only the genuine match survives
+    assert items[0].relevance == 0.9                    # full whole-word match
 
 
 def test_bilibili_is_engine_source_with_two_tiers():

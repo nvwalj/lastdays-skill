@@ -54,6 +54,21 @@ def test_ranking_score_full_above_partial():
     assert tr("人工智能", "人工智能大爆发") >= 0.75
 
 
+def test_cjk_short_query_needs_whole_word():
+    # Regression (2026-06-08): a 2-bigram query (泰瑞达={泰瑞,瑞达}) must NOT be
+    # satisfied by one shared bigram (瑞达) -- B站 fuzzed 泰瑞达/Teradyne into "瑞达"
+    # game clips and 瑞达利欧/Ray-Dalio videos.
+    assert not is_on_topic("泰瑞达", "瑞达每日精选")          # 1/2 bigrams -> off
+    assert not is_on_topic("泰瑞达", "瑞达利欧谈债务危机")     # Ray Dalio, not Teradyne
+    assert is_on_topic("泰瑞达", "泰瑞达 Q1 财报超预期")       # whole word -> on
+    assert is_on_topic("泰瑞达", "买入泰瑞达的逻辑")           # embedded whole word -> on
+    assert not is_on_topic("小米", "大米价格上涨")             # 2-char already needed whole word
+    assert is_on_topic("小米", "小米SU7 发布会")
+    # Longer queries keep the lenient 0.5 coverage -- must NOT regress.
+    assert is_on_topic("人工智能", "AI 与人工智能浪潮")
+    assert is_on_topic("开源大模型", "国产开源模型最新进展")   # 2/4 bigrams still on topic
+
+
 def test_empty_inputs():
     assert not is_on_topic("", "anything")
     assert not is_on_topic("query", "")

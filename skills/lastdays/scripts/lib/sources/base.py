@@ -75,9 +75,26 @@ def _query_hits(query: str, text: str):
     return uniq, hits
 
 
+def _cjk_required_cover(n_bigrams: int) -> float:
+    """Coverage needed to call a CJK query on-topic, scaled by query length.
+
+    A short query has so few bigrams that the flat 0.5 floor means HALF the word
+    matching counts as on-topic -- "瑞达" (a game NPC, or 瑞达利欧/Ray Dalio) then
+    satisfies "泰瑞达" (Teradyne). Require the WHOLE short word; keep the lenient
+    0.5 for longer queries, where the full string rarely appears verbatim and
+    reordered fragments ("大模型开源" for "开源大模型") should still match.
+    """
+    return 1.0 if n_bigrams <= 2 else CJK_ON_TOPIC_COVER
+
+
 def _cjk_match(query: str, text: str) -> bool:
     # On-topic if enough query bigrams appear (not the whole string verbatim).
-    return _cjk_coverage(query, text) >= CJK_ON_TOPIC_COVER
+    # The threshold scales with query length so a short word ("泰瑞达", 2 bigrams)
+    # is not satisfied by a single shared bigram ("瑞达").
+    qb = _cjk_bigrams(query)
+    if not qb:
+        return False
+    return _cjk_coverage(query, text) >= _cjk_required_cover(len(qb))
 
 
 def is_on_topic(query: str, text: str) -> bool:
