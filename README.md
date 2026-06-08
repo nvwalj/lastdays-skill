@@ -5,8 +5,8 @@ English | [简体中文](README.zh-CN.md)
 **Research what people actually said about a topic in the last N days (default 30, configurable) — zero config, runs on your subscription, burns no API keys.**
 
 A lean, subscription-friendly rewrite of the multi-source "last 30 days" research
-skill. A zero-key Python engine pulls **Reddit, Hacker News, GitHub, Lobsters, and
-Polymarket** with real engagement (upvotes, points, comments, volume) inside a
+skill. A zero-key Python engine pulls **Reddit, Hacker News, GitHub, Lobsters,
+Polymarket, and Stack Overflow** with real engagement (upvotes, points, comments, volume) inside a
 strict, configurable date window. The agent host (Claude Code or OpenAI Codex)
 plans the targeting, fills the open-web / X / Chinese layers via WebSearch, and
 synthesizes one grounded, cited brief. No API key required — the agent is the LLM.
@@ -70,6 +70,7 @@ reliable headless brief, use `--provider anthropic` with `ANTHROPIC_API_KEY`, or
 | Hacker News | en | ✅ Algolia | points, comments | keyless |
 | Lobsters | en | ✅ hot list | score, comments | keyless — hot-list match (no JSON search), tech-focused |
 | Dev.to | en | ✅ tag API | reactions, comments | keyless — dev blog posts, tag-search + on-topic filter |
+| Stack Overflow | en | ✅ search API | score, answers, views | keyless (~300/day) — strict `fromdate` window, tag-gated; technical topics |
 | GitHub | en | ✅ Search API | comments, reactions | keyless (`GITHUB_TOKEN` lifts limit) |
 | Reddit | en | ✅ public `.json` | score, comments | keyless (403 on datacenter IPs → agent supplements) |
 | Polymarket | en | ✅ Gamma | volume | keyless (403 on datacenter IPs → agent supplements) |
