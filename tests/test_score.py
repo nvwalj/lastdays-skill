@@ -48,6 +48,29 @@ def test_relevance_gate_keeps_offtopic_viral_below_relevant():
     assert ranked[0].score > ranked[1].score
 
 
+def test_recency_gate_fresh_offtopic_below_stale_relevant():
+    # Regression (2026-06-08): recency was NOT relevance-gated, so a brand-new
+    # off-topic item (low rel, rec~1.0) banked a full recency contribution and
+    # outranked an older but genuinely relevant item -- the "We Need VAT and UBI
+    # crashes the top 10 of a web-scraping query" bug. Engagement is held equal
+    # across both items so this test isolates the recency dimension.
+    w = Window(days=30, now=datetime(2026, 6, 8, tzinfo=timezone.utc))
+    eng = {"points": 50, "comments": 10}
+    fresh_offtopic = Item(
+        source="hackernews", lang="en", title="We Need VAT and UBI", url="off",
+        date="2026-06-08", ts=_ts(2026, 6, 8), engagement=dict(eng), relevance=0.30,
+    )
+    stale_relevant = Item(
+        source="hackernews", lang="en", title="on topic but older", url="on",
+        date="2026-05-12", ts=_ts(2026, 5, 12), engagement=dict(eng), relevance=0.70,
+    )
+    items = [fresh_offtopic, stale_relevant]
+    score.score_items(items, w)
+    ranked = score.rank(items)
+    assert ranked[0].url == "on"            # relevance-gated recency: relevant wins
+    assert ranked[0].score > ranked[1].score
+
+
 def test_engagement_raw_unknown_is_none():
     assert score.engagement_raw("hackernews", {}) is None
     assert score.engagement_raw("github", {"comments": 3}) is not None

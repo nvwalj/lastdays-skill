@@ -67,16 +67,21 @@ def score_items(items: list[Item], window: Window) -> None:
             eng_norm = 0.0 if r is None else (r - lo) / span
             rec = window.recency(it.ts if it.ts is not None else it.date)
             rel = max(0.0, min(1.0, it.relevance))
-            # Relevance-gate the engagement reward: a high-engagement but
-            # off-topic item (a viral post that merely shares a query word) must
-            # NOT outrank a genuinely relevant one. Without this, a Polymarket
-            # market with huge volume or a 400-point HN noise story sorted above
-            # the actual answer. The gate scales engagement's contribution by
-            # relevance, so a floor-relevance item gets little engagement lift.
+            # Relevance-gate BOTH the engagement and recency rewards: an
+            # off-topic item must not outrank a relevant one by being viral OR by
+            # being fresh. Engagement gating stops a 400-point HN noise story (or
+            # a huge-volume Polymarket market) from riding upvotes to the top.
+            # Recency gating stops a brand-new but irrelevant story (rel at the
+            # no-match floor, rec~1.0) from banking a full 25-pt recency
+            # contribution and crashing the top 10 (e.g. "We Need VAT and UBI"
+            # under a "web scraping" query). Relevance is the base that unlocks
+            # the other two dimensions; two equally-relevant items still order by
+            # recency and engagement exactly as before.
             gated_eng = eng_norm * rel
+            gated_rec = rec * rel
             base = 100.0 * (
                 WEIGHTS["relevance"] * rel
-                + WEIGHTS["recency"] * rec
+                + WEIGHTS["recency"] * gated_rec
                 + WEIGHTS["engagement"] * gated_eng
             )
             if r is None:
