@@ -27,7 +27,7 @@ if sys.version_info < MIN_PYTHON:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from lib import dates, normalize, registry, score, tiers  # noqa: E402
+from lib import dates, demandmine, normalize, registry, score, tiers  # noqa: E402
 from lib import env as env_mod  # noqa: E402
 from lib import http as http_mod  # noqa: E402
 from lib import providers  # noqa: E402
@@ -196,6 +196,9 @@ def main(argv=None) -> int:
     ap.add_argument("--refresh", action="store_true", help="bypass the HTTP cache and fetch fresh")
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--diagnose", action="store_true", help="list sources + auth status, then exit")
+    ap.add_argument("--mode", default="topic", choices=["topic", "demand"],
+                    help="'topic' research (default), or 'demand' to mine unmet-need signals "
+                         "(topic narrows to a domain; empty topic = open radar)")
     args = ap.parse_args(argv)
 
     if args.refresh:
@@ -206,14 +209,34 @@ def main(argv=None) -> int:
         return _diagnose()
 
     topic = " ".join(args.topic).strip()
-    if not topic:
+    if args.mode == "topic" and not topic:  # topic required (checked first, as before)
         ap.error('a topic is required, e.g. lastdays "Claude Code" --days 7')
     try:
         days = dates.parse_days(args.days)
     except ValueError as e:
         ap.error(str(e))
-
     config = env_mod.get_config()
+
+    if args.mode == "demand":
+        # Demand-signal mining: topic (if given) narrows to a domain; empty = open radar.
+        if args.synthesize or args.emit == "json":
+            sys.stderr.write(
+                "[demand] --emit/--synthesize are ignored in --mode demand; it prints a "
+                "DEMAND SIGNALS block for the agent to cluster.\n"
+            )
+        window = dates.Window.from_days(days)
+        raw_sources = args.sources or ",".join(demandmine.TECH_SOURCES)
+        try:
+            src_names = registry.resolve_names(raw_sources, args.lang)
+        except ValueError as e:
+            ap.error(str(e))
+        signals = demandmine.mine(
+            window, sources=src_names, env=config, domain=topic or None,
+            depth=args.depth, allow_undated=args.allow_undated,
+        )
+        print(render_mod.render_demand(signals, window, topic or None))
+        return 0
+
     report = run(topic, days, args.lang, args.sources, args.depth, args.allow_undated, config)
     print(render_mod.render(report, args.emit))
 

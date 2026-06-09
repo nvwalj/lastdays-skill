@@ -1,7 +1,7 @@
 {
   "name": "lastdays",
   "version": "0.1.0",
-  "description": "Research what people actually said about a topic over the last N days (default 30, configurable). Zero-key engine for Reddit, Hacker News, GitHub, and Polymarket with real engagement, plus agent-driven web/X/Chinese layers. Claude + OpenAI, subscription-friendly, no API key required.",
+  "description": "Research what people actually said about a topic over the last N days (default 30, configurable). Zero-key engine for Reddit, Hacker News, GitHub, Stack Overflow, Lemmy, Bluesky, and Polymarket with real engagement, plus agent-driven web/X/Chinese layers. Also a demand-mining mode (--mode demand / demandmine skill) that surfaces unmet-need and startup-opportunity signals. Claude + OpenAI, subscription-friendly, no API key required.",
   "author": {
     "name": "nvwalj"
   },
@@ -16,6 +16,9 @@
     "polymarket",
     "news",
     "multi-source",
-    "citations"
+    "citations",
+    "demand-mining",
+    "startup-ideas",
+    "pain-points"
   ]
 }

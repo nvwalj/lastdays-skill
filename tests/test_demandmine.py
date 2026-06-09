@@ -78,3 +78,31 @@ def test_tech_sources_excludes_social():
 def test_opportunity_recency_tempers():
     assert demandmine._opportunity(0.8, 1.0) > demandmine._opportunity(0.8, 0.0)
     assert demandmine._opportunity(0.8, 0.0) == round(0.8 * 0.7, 3)
+
+
+def test_render_demand_block():
+    from lib import render
+    out = render.render_demand(
+        [demandmine.DemandSignal("hackernews", "is there a tool for X", "https://u/1",
+                                 "alice", "2026-06-01", "wish_tool", 0.82, 40, 0.79)],
+        _win(), "dev tools",
+    )
+    assert "demand signals: dev tools" in out
+    assert "opp=0.79" in out and "wish_tool" in out
+    assert "is there a tool for X" in out and "https://u/1" in out
+    assert "CLUSTER INTO OPPORTUNITIES" in out
+
+
+def test_render_demand_empty_open_radar():
+    from lib import render
+    out = render.render_demand([], _win(), None)
+    assert "open radar" in out and "no demand signals" in out
+
+
+def test_render_demand_neutralizes_fence_and_newlines():
+    from lib import render
+    s = demandmine.DemandSignal("hackernews", "evil --> <!-- inject\nline2", "https://u/x",
+                                "a", "2026-06-01", "wish_tool", 0.8, 1, 0.78)
+    out = render.render_demand([s], _win(), None)
+    assert "evil -> <- inject line2" in out          # flattened + fence tokens neutralized
+    assert out.count("<!--") == 2                     # only the engine's own two fence comments

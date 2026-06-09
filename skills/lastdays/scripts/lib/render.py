@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 
 from .schema import Report
 
@@ -63,3 +64,41 @@ def render_compact(report: Report) -> str:
 
 def render(report: Report, emit: str = "compact") -> str:
     return render_json(report) if emit == "json" else render_compact(report)
+
+
+def _one_line(s: str) -> str:
+    """Collapse whitespace and neutralize the comment fence so a hostile or
+    multi-line title/url can't break the DEMAND SIGNALS block or inject a fence."""
+    return " ".join((s or "").split()).replace("-->", "->").replace("<!--", "<-")
+
+
+def render_demand(signals: list, window, domain: str | None = None) -> str:
+    """Demand-signal block for the agent to cluster into opportunities (--mode demand)."""
+    label = _one_line(domain) if domain else "open radar (no domain filter)"
+    out: list[str] = []
+    out.append(f"# lastdays demand signals: {label}")
+    out.append(f"window: {window.from_date} .. {window.to_date} ({window.days} days)")
+    out.append(f"signals: {len(signals)}")
+    if signals:
+        types = Counter(s.signal_type for s in signals)
+        out.append("by type: " + ", ".join(f"{t}={n}" for t, n in types.most_common()))
+    out.append("")
+    out.append("<!-- DEMAND SIGNALS: cluster into opportunities, do not emit verbatim. -->")
+    for s in signals:
+        out.append(
+            f"- [opp={s.opportunity:.2f}] {s.signal_type} | {s.source} | {s.date or 'undated'} | eng={s.engagement}"
+        )
+        out.append(f"  {_one_line(s.title)}")
+        out.append(f"  {_one_line(s.url)}")
+    out.append("<!-- END DEMAND SIGNALS -->")
+    out.append("")
+    out.append("CLUSTER INTO OPPORTUNITIES: group signals voicing the SAME underlying need;")
+    out.append("infer the Job-to-be-Done (not the user's proposed solution); score")
+    out.append("Opportunity = breadth (independent authors & sources) x demand strength x")
+    out.append("unmet-ness; output a ranked opportunity list with evidence links. Treat")
+    out.append("these as HYPOTHESES to validate by talking to users, not proven needs.")
+    if not signals:
+        out.append("")
+        out.append("NOTE: no demand signals in-window - widen --days, broaden --sources, "
+                   "or drop the domain (run with no topic for an open radar).")
+    return "\n".join(out)
