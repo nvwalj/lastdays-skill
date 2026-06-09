@@ -10,6 +10,7 @@
 | Stack Overflow | en | Python engine (search/advanced API) | score, answers, views | ✅ implemented, keyless — server-side `fromdate` window; tag-gated, technical topics |
 | GitHub | en | Python engine (Search API) | comments, reactions | ✅ implemented, keyless* |
 | Reddit | en | Python engine (`.json`, RSS fallback) | score, comments (json only) | ✅ implemented, keyless** |
+| Lemmy | en | Python engine (search API, `Top<period>` sort) | score, comments | ✅ implemented, keyless — federated Reddit alt; zero-key complement when Reddit 403s (env `LEMMY_INSTANCE`) |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
 | Bilibili B站 | zh | Python engine (wbi search) | views, danmaku, favorites | ✅ implemented, keyless |
 | Douyin 抖音 | zh | Python engine (hot-search board) | hot_value, rank | ✅ implemented, keyless — see note**** |
