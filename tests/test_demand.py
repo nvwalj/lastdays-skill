@@ -24,6 +24,13 @@ def test_payment_requires_purchase_object():
     assert demand_signal("I would happily pay for a service like that")[1] == "payment"
 
 
+def test_payment_recall_purchase_phrasings():
+    # reviewer-flagged recall gaps: monthly/premium/purchase phrasings.
+    assert demand_signal("I'd pay monthly for a tool that does this")[1] == "payment"
+    assert demand_signal("I'd pay a premium for reliable sync")[1] == "payment"
+    assert demand_signal("I would purchase a service like that")[1] == "payment"
+
+
 def test_wish_tool_positive():
     assert _type("is there an app that syncs notes across devices?") == "wish_tool"
     assert _type("someone should build a tool for this") == "wish_tool"

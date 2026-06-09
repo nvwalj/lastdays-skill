@@ -30,10 +30,10 @@ _SIGNALS: list[tuple[str, str, float]] = [
     # Willingness to pay -- the strongest signal.
     # Require a PURCHASE object ("pay for/$N/to use") -- "pay to see/fight" is
     # consumption, not product demand (measured: bare "I'd pay" was noisy).
-    (r"\b(i ?'?d|i would|would happily|happy to|willing to|gladly)\s+pay\s+(for|to use|to have|to get|\$\d+|money for|good money|handsomely)\b", "payment", 0.92),
+    (r"\b(i ?'?d|i would|would happily|happy to|willing to|gladly)\s+pay\s+(for|to use|to have|to get|\$\d+|money for|good money|handsomely|monthly for|a premium|premium for)\b", "payment", 0.92),
     (r"\btake my money\b", "payment", 0.9),
     (r"\bshut up and take\b", "payment", 0.9),
-    (r"\b(i ?'?d|i would)\s+(buy|subscribe to)\s+(a|an|this|some)\b", "payment", 0.88),
+    (r"\b(i ?'?d|i would|happy to)\s+(buy|purchase|subscribe to)\s+(a|an|this|some|it)\b", "payment", 0.88),
     # Explicit request for a tool that should exist.
     (rf"\bis there (a|an|any|some)\s+{_TOOL}\b", "wish_tool", 0.82),
     (rf"\bi wish (there (was|were)|i had|some ?(one|body) (would|could) (make|build))\b.{{0,25}}{_TOOL}", "wish_tool", 0.82),

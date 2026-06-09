@@ -48,6 +48,7 @@ python3 skills/lastdays/scripts/lastdays.py --diagnose      # list sources + aut
 | `--depth quick\|default\|deep` | result volume per source |
 | `--emit compact\|json` | evidence block (default) or JSON |
 | `--allow-undated` | keep items with no detectable date |
+| `--mode topic\|demand` | `topic` research (default), or `demand` to mine unmet-need signals |
 | `--synthesize` | also emit a brief via a reasoning provider (headless/cron) |
 | `--provider local\|auto\|openai\|anthropic` | provider for `--synthesize` (default `local` = the agent host) |
 | `--diagnose` | list sources + OpenAI/GitHub auth, then exit |
@@ -62,6 +63,24 @@ it uses your ChatGPT/Codex login if present (no API key, no spend) and falls bac
 Note: OpenAI's Codex subscription endpoint is unofficial and currently flaky (HTTP 400). For a
 reliable headless brief, use `--provider anthropic` with `ANTHROPIC_API_KEY`, or set
 `LASTDAYS_OPENAI_PREFER_KEY=1` with `OPENAI_API_KEY`.
+
+## Demand mining (`--mode demand`)
+
+Find unmet user needs / startup-opportunity signals instead of researching a topic.
+Same engine, but it queries demand **signal phrases** ("is there a tool…", "I wish there
+was…", "I'd pay for…") across technical communities, gates them by demand strength
+(`lib/demand.py`), and prints a `DEMAND SIGNALS` block for you to cluster into opportunities.
+
+```bash
+python3 skills/lastdays/scripts/lastdays.py "developer tools" --mode demand --days 90
+python3 skills/lastdays/scripts/lastdays.py --mode demand --days 90   # open radar (no domain)
+```
+
+Or in Claude Code: `/demandmine developer tools` — the agent runs the engine, clusters
+signals into Jobs-to-be-Done, scores them Ulwick-style (breadth × demand strength ×
+unmet-ness), and outputs a ranked opportunity list. Default sources are the technical set
+(HN / Stack Overflow / GitHub / Lemmy / Reddit; social chatter is filtered for signal
+quality). Signals are **hypotheses to validate** by talking to users, not proven demand.
 
 ## Source matrix
 
