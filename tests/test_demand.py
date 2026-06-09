@@ -78,6 +78,12 @@ def test_seeking_signals():
     assert is_demand("need a way to batch-rename files by date")
 
 
+def test_seeking_better_way_needs_an_object():
+    # "a better way to/of X" is a real ask; a bare colloquial "better way" is noise.
+    assert _type("there has to be a better way to manage these invoices") == "seeking"
+    assert demand_signal("ugh, there has to be a better way")[1] != "seeking"
+
+
 def test_no_signal_and_empty():
     assert demand_signal("had a great lunch today, lovely weather") == (0.0, None)
     assert demand_signal("") == (0.0, None)

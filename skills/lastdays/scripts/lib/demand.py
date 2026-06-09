@@ -54,7 +54,7 @@ _SIGNALS: list[tuple[str, str, float]] = [
     (r"\bwish (it|they) (could|had|would|supported)\b", "feature_request", 0.6),
     # Seeking a solution / recommendation / a better way (implicit demand). Added
     # after 3-agent review flagged these as the top recall gaps.
-    (r"\b(there (has to|must) be|is there) a better way\b", "seeking", 0.7),
+    (r"\b(there (has to|must) be|is there) a better way (to|of|for|than)\b", "seeking", 0.7),
     (r"\bwhat (do|are) (you|people|folks|the best)\b.{0,25}(use|using|recommend)\b", "seeking", 0.62),
     (rf"\brecommendations? for\b.{{0,20}}{_TOOL}", "seeking", 0.62),
     (r"\bhow do (you|y'?all|people|folks|i)\b.{0,30}(deal with|handle|manage|cope with|automate)\b", "seeking", 0.6),

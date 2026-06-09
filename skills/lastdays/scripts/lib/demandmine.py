@@ -36,6 +36,11 @@ SIGNAL_QUERIES = [
     "is there an app",
 ]
 
+# Convenience source set for demand mining: technical communities only. Excludes
+# bluesky / CJK-video sources, whose social chatter dilutes product-demand
+# signals (measured: open radar with bluesky was much noisier than without).
+TECH_SOURCES = ["hackernews", "stackexchange", "github", "lemmy", "reddit"]
+
 
 @dataclass
 class DemandSignal:

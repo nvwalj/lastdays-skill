@@ -70,6 +70,11 @@ def test_out_of_window_dropped(monkeypatch):
     assert demandmine.mine(_win(), sources=["hackernews"], env={}) == []       # 5 months old
 
 
+def test_tech_sources_excludes_social():
+    assert "bluesky" not in demandmine.TECH_SOURCES   # social chatter dilutes demand signals
+    assert {"hackernews", "stackexchange", "github"} <= set(demandmine.TECH_SOURCES)
+
+
 def test_opportunity_recency_tempers():
     assert demandmine._opportunity(0.8, 1.0) > demandmine._opportunity(0.8, 0.0)
     assert demandmine._opportunity(0.8, 0.0) == round(0.8 * 0.7, 3)
