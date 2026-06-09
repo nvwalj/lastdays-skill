@@ -17,6 +17,13 @@ def test_payment_is_strongest():
     assert demand_signal("shut up and take my money, build this")[1] == "payment"
 
 
+def test_payment_requires_purchase_object():
+    # "pay to see/fight" is consumption, not product demand -> not payment.
+    assert demand_signal("honestly I'd pay to see him in the ring")[1] != "payment"
+    assert demand_signal("I'd pay $40 for a tool that does this")[1] == "payment"
+    assert demand_signal("I would happily pay for a service like that")[1] == "payment"
+
+
 def test_wish_tool_positive():
     assert _type("is there an app that syncs notes across devices?") == "wish_tool"
     assert _type("someone should build a tool for this") == "wish_tool"
