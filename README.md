@@ -6,7 +6,7 @@ English | [简体中文](README.zh-CN.md)
 
 A lean, subscription-friendly rewrite of the multi-source "last 30 days" research
 skill. A zero-key Python engine pulls **Reddit, Hacker News, GitHub, Lobsters,
-Polymarket, Stack Overflow, Lemmy, and Bluesky** with real engagement (upvotes, points, comments, volume) inside a
+Polymarket, Kalshi, Stack Overflow, Lemmy, and Bluesky** with real engagement (upvotes, points, comments, volume) inside a
 strict, configurable date window. The agent host (Claude Code or OpenAI Codex)
 plans the targeting, fills the open-web / X / Chinese layers via WebSearch, and
 synthesizes one grounded, cited brief. No API key required — the agent is the LLM.
@@ -95,6 +95,7 @@ quality). Signals are **hypotheses to validate** by talking to users, not proven
 | Lemmy | en | ✅ search API | score, comments | keyless — federated Reddit alt; `Top<period>` sort, env `LEMMY_INSTANCE` |
 | Bluesky | en | ✅ searchPosts | likes, reposts, replies | keyless — AT Proto; structured-engagement complement to the X/WebSearch layer |
 | Polymarket | en | ✅ Gamma | volume | keyless (403 on datacenter IPs → agent supplements) |
+| Kalshi | en | ✅ search API | volume (contracts) | keyless — CFTC-regulated US prediction market; odds quoted as a live snapshot dated at fetch time |
 | Bilibili | zh | ✅ wbi search | views, danmaku, favorites | keyless (anonymous buvid3 + wbi md5 sign) |
 | Douyin | zh | ✅ hot-search board | hot_value, rank | keyless — trending-board match, not full search |
 | Weibo / Zhihu / Xiaohongshu | zh | ⏳ stub | — | login-walled / anti-bot → agent WebSearch `site:` |

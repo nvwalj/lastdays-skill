@@ -13,6 +13,7 @@
 | Lemmy | en | Python engine (search API, `Top<period>` sort) | score, comments | ✅ implemented, keyless — federated Reddit alt; zero-key complement when Reddit 403s (env `LEMMY_INSTANCE`) |
 | Bluesky | en | Python engine (searchPosts, 2-host tier) | likes, reposts, replies | ✅ implemented, keyless — AT Proto; structured-engagement complement to the X/WebSearch layer |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
+| Kalshi | en | Python engine (public search API) | volume (contracts) | ✅ implemented, keyless — CFTC-regulated US prediction market; open markets are dated at fetch time (live-odds snapshot, recorded in `metadata.date_basis`) |
 | Bilibili B站 | zh | Python engine (wbi search) | views, danmaku, favorites | ✅ implemented, keyless |
 | Douyin 抖音 | zh | Python engine (hot-search board) | hot_value, rank | ✅ implemented, keyless — see note**** |
 | Weibo 微博 | zh | agent WebSearch (`site:weibo.com`) | — | ⏳ stub — login-walled*** |

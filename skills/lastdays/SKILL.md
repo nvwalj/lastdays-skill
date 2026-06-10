@@ -3,7 +3,7 @@ name: lastdays
 description: >-
   Research what people actually said about a topic over the last N days (default
   30, configurable). A zero-key Python engine pulls Reddit, Hacker News, GitHub,
-  Polymarket, Lobsters, Stack Overflow, Lemmy, Bluesky, and Chinese sources (Bilibili, Douyin) with real
+  Polymarket, Kalshi, Lobsters, Stack Overflow, Lemmy, Bluesky, and Chinese sources (Bilibili, Douyin) with real
   engagement (upvotes, points, comments, volume) and a strict date window; you
   supplement the open web and X via WebSearch and
   synthesize one grounded, cited brief. Use for recent-trend research, "what's
@@ -53,7 +53,7 @@ SKILL_DIR="<absolute dir of this SKILL.md>"
 python3 "$SKILL_DIR/scripts/lastdays.py" "<TOPIC>" --days <N> --lang <en|zh|both> --emit compact
 ```
 
-The engine prints an `EVIDENCE FOR SYNTHESIS` block (ranked Reddit / Hacker News / GitHub / Polymarket / Lobsters / Stack Overflow / Lemmy / Bluesky items — plus Bilibili / Douyin under `--lang zh`/`both` — with real engagement, strictly inside the window) and a `WEB LAYERS TO FILL` list. Each item line shows `score=` and `rel=` (relevance 0–0.9); prefer high-`rel` items and treat low-`rel` ones (engine kept them but flagged weak) with skepticism. Read the evidence; **do not** paste it back verbatim. Run `--diagnose` once if you want to see which sources are live vs stub.
+The engine prints an `EVIDENCE FOR SYNTHESIS` block (ranked Reddit / Hacker News / GitHub / Polymarket / Kalshi / Lobsters / Stack Overflow / Lemmy / Bluesky items — plus Bilibili / Douyin under `--lang zh`/`both` — with real engagement, strictly inside the window) and a `WEB LAYERS TO FILL` list. Each item line shows `score=` and `rel=` (relevance 0–0.9); prefer high-`rel` items and treat low-`rel` ones (engine kept them but flagged weak) with skepticism. Read the evidence; **do not** paste it back verbatim. Run `--diagnose` once if you want to see which sources are live vs stub.
 
 ## Step 3 — Fill the web / X / Chinese layers yourself
 
@@ -75,7 +75,7 @@ Read `references/synthesis-rules.md` and follow it. In short: first line is the 
 
 ## Source switches & Chinese status
 
-- `--sources reddit,hackernews,github,polymarket,lobsters` — pick a subset (aliases: `hn`, `gh`, `pm`, `r`, `lob`).
+- `--sources reddit,hackernews,github,polymarket,kalshi,lobsters` — pick a subset (aliases: `hn`, `gh`, `pm`, `ks`, `r`, `lob`).
 - `--lang zh` routes the five Chinese platforms to your WebSearch layer; `--lang both` adds them on top of the English engine sources.
 - `--allow-undated` keeps items with no detectable date (off by default).
 - You write the synthesis here in chat (zero cost). `--synthesize` (engine-side LLM) is for headless/cron only - do not use it in this interactive flow.

@@ -3,7 +3,7 @@
 
 **研究最近 N 天里人们究竟如何谈论某个话题（默认 30 天，可配置）- 零配置，使用你的订阅运行，不消耗任何 API key。**
 
-这是对多源「最近 30 天」研究 skill 的轻量重写，对订阅用户友好。零 key 的 Python 引擎会在严格、可配置的时间窗口内抓取 **Reddit、Hacker News、GitHub 和 Polymarket** 的真实互动数据（赞同票、points、评论、交易量）。agent 宿主（Claude Code 或 OpenAI Codex）负责规划目标，通过 WebSearch 补齐 open-web / X / 中文层面的材料，并综合成一份有依据、有引用的简报。无需 API key：agent 本身就是 LLM。
+这是对多源「最近 30 天」研究 skill 的轻量重写，对订阅用户友好。零 key 的 Python 引擎会在严格、可配置的时间窗口内抓取 **Reddit、Hacker News、GitHub、Lobsters、Polymarket、Kalshi、Stack Overflow、Lemmy 和 Bluesky** 的真实互动数据（赞同票、points、评论、交易量）。agent 宿主（Claude Code 或 OpenAI Codex）负责规划目标，通过 WebSearch 补齐 open-web / X / 中文层面的材料，并综合成一份有依据、有引用的简报。无需 API key：agent 本身就是 LLM。
 
 ## 相对原版有哪些变化
 
@@ -61,9 +61,15 @@ python3 skills/lastdays/scripts/lastdays.py --diagnose      # list sources + aut
 | 来源 | 语言 | 引擎 | 互动指标 | 状态 |
 |------|------|------|----------|------|
 | Hacker News | en | ✅ Algolia | points, comments | 无需 API key |
+| Lobsters | en | ✅ hot list | score, comments | 无需 API key — 热榜匹配（无 JSON 搜索），偏技术话题 |
+| Dev.to | en | ✅ tag API | reactions, comments | 无需 API key — 开发者博客，tag 搜索 + 主题过滤 |
+| Stack Overflow | en | ✅ search API | score, answers, views | 无需 API key（约 300 次/天）— 服务端 `fromdate` 窗口；技术话题 |
 | GitHub | en | ✅ Search API | comments, reactions | 无需 API key（`GITHUB_TOKEN` 可提高限额） |
 | Reddit | en | ✅ public `.json` | score, comments | 无需 API key（数据中心 IP 可能 403 → agent 补充） |
+| Lemmy | en | ✅ search API | score, comments | 无需 API key — 联邦制 Reddit 替代；`Top<period>` 排序，env `LEMMY_INSTANCE` |
+| Bluesky | en | ✅ searchPosts | likes, reposts, replies | 无需 API key — AT Proto；补充 X/WebSearch 层的结构化互动数据 |
 | Polymarket | en | ✅ Gamma | volume | 无需 API key（数据中心 IP 可能 403 → agent 补充） |
+| Kalshi | en | ✅ search API | volume（合约张数） | 无需 API key — CFTC 监管的美国预测市场；赔率按抓取时刻的实时快照计日期 |
 | Bilibili(B站) | zh | ✅ wbi search | views, danmaku, favorites | 无需 API key（匿名 buvid3 + wbi md5 签名） |
 | Douyin(抖音) | zh | ✅ hot-search board | hot_value, rank | 无需 API key；趋势榜匹配，不是完整搜索 |
 | Weibo / Zhihu / Xiaohongshu | zh | ⏳ stub | — | 登录墙 / 反 bot → agent WebSearch `site:` |
