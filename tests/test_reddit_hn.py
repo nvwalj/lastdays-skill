@@ -142,3 +142,52 @@ def test_hn_short_window_single_page(monkeypatch):
     w = Window(days=7, now=datetime(2026, 6, 7, tzinfo=timezone.utc))
     hackernews.fetch("AI", w, env={})
     assert len(calls) == 1                        # short window: one request only
+
+
+# --- oldweb tier (2026-06-10): old.reddit HTML with real engagement ----------
+
+_OLD_HTML = """<div class="contents">
+<div class=" search-result search-result-link has-thumbnail " data-fullname="t3_1tva44g">
+<header class="search-result-header"><a href="https://old.reddit.com/r/ClaudeCode/comments/1tva44g/i_live_by_sfo/" class="search-title may-blank" >I built a projection &amp; mapping rig</a></header>
+<div class="search-result-meta"><span class="search-score">3,822 points</span>&#32;<a href="https://old.reddit.com/r/ClaudeCode/comments/1tva44g/i_live_by_sfo/" class="search-comments may-blank" >156 comments</a>&#32;<span class="search-time">submitted&#32;<time title="Wed Jun 3 01:04:03 2026 UTC" datetime="2026-06-03T01:04:03+00:00">7 days ago</time></span>&#32;<span class="search-author">by&#32;<a href="https://old.reddit.com/user/I_am_Root01" class="author may-blank id-t2_oyaxwi3" >I_am_Root01</a></span>&#32;<span>to&#32;<a href="https://old.reddit.com/r/ClaudeCode/" class="search-subreddit-link may-blank" >r/ClaudeCode</a></span></div></div>
+<div class=" search-result search-result-link " data-fullname="t3_broken1">
+<div class="search-result-meta"><span class="search-score">10 points</span></div></div>
+</div>"""
+
+
+def test_reddit_falls_back_to_oldweb_on_403(monkeypatch):
+    def boom(*a, **k):
+        raise reddit.http.HTTPError("403", status_code=403)
+
+    monkeypatch.setattr(reddit.http, "get", boom)
+    monkeypatch.setattr(reddit.http, "get_text", lambda *a, **k: _OLD_HTML)
+    w = Window(days=7, now=datetime(2026, 6, 9, tzinfo=timezone.utc))
+    items, used = tiers.run_tiers(registry.get("reddit"), "claude code", w, env={})
+
+    assert used.label == "oldweb"                # json 403 -> oldweb, NOT rss
+    assert len(items) == 1                        # block without a title link skipped
+    it = items[0]
+    assert it.title == "I built a projection & mapping rig"   # entities unescaped
+    assert it.url == "https://www.reddit.com/r/ClaudeCode/comments/1tva44g/i_live_by_sfo/"
+    assert it.engagement == {"score": 3822, "comments": 156}  # commas stripped, real numbers
+    assert it.date == "2026-06-03" and it.ts is not None
+    assert it.author == "I_am_Root01"
+    assert it.container == "r/ClaudeCode"
+    assert it.item_id == "rd1tva44g"
+    assert it.metadata.get("tier") == "oldweb"
+    assert "degraded" not in it.metadata          # real engagement -> not degraded
+
+
+def test_reddit_oldweb_empty_html_falls_to_rss(monkeypatch):
+    def boom(*a, **k):
+        raise reddit.http.HTTPError("403", status_code=403)
+
+    rss = """<feed><entry><title>Nvidia hits new high</title>
+      <link href="https://www.reddit.com/r/stocks/comments/abc123/x/" />
+      <updated>2026-06-02T10:00:00+00:00</updated></entry></feed>"""
+    monkeypatch.setattr(reddit.http, "get", boom)
+    # get_text serves BOTH oldweb (html, no posts) and rss tiers here
+    monkeypatch.setattr(reddit.http, "get_text", lambda *a, **k: rss)
+    w = Window(days=7, now=datetime(2026, 6, 2, tzinfo=timezone.utc))
+    items, used = tiers.run_tiers(registry.get("reddit"), "Nvidia", w, env={})
+    assert used.label == "rss" and len(items) == 1

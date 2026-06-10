@@ -65,15 +65,23 @@ python3 skills/lastdays/scripts/lastdays.py --diagnose      # list sources + aut
 | Dev.to | en | ✅ tag API | reactions, comments | 无需 API key — 开发者博客，tag 搜索 + 主题过滤 |
 | Stack Overflow | en | ✅ search API | score, answers, views | 无需 API key（约 300 次/天）— 服务端 `fromdate` 窗口；技术话题 |
 | GitHub | en | ✅ Search API | comments, reactions | 无需 API key（`GITHUB_TOKEN` 可提高限额） |
-| Reddit | en | ✅ public `.json` | score, comments | 无需 API key（数据中心 IP 可能 403 → agent 补充） |
+| Reddit | en | ✅ 三层降级：`.json` → old.reddit HTML → RSS | score, comments | 无需 API key — Reddit 按 TLS 指纹（JA3）拦非浏览器客户端导致 `.json` 常 403；old.reddit HTML 层仍能拿到真实分数/评论数，RSS 是无互动数的兜底 |
 | Lemmy | en | ✅ search API | score, comments | 无需 API key — 联邦制 Reddit 替代；`Top<period>` 排序，env `LEMMY_INSTANCE` |
 | Bluesky | en | ✅ searchPosts | likes, reposts, replies | 无需 API key — AT Proto；补充 X/WebSearch 层的结构化互动数据 |
 | Polymarket | en | ✅ Gamma | volume | 无需 API key（数据中心 IP 可能 403 → agent 补充） |
 | Kalshi | en | ✅ search API | volume（合约张数） | 无需 API key — CFTC 监管的美国预测市场；赔率按抓取时刻的实时快照计日期 |
 | Bilibili(B站) | zh | ✅ wbi search | views, danmaku, favorites | 无需 API key（匿名 buvid3 + wbi md5 签名） |
 | Douyin(抖音) | zh | ✅ hot-search board | hot_value, rank | 无需 API key；趋势榜匹配，不是完整搜索 |
-| Weibo / Zhihu / Xiaohongshu | zh | ⏳ stub | — | 登录墙 / 反 bot → agent WebSearch `site:` |
+| Xiaohongshu(小红书) | zh | ✅ 本地 bridge | likes, collects, comments | 可选 — 本机跑着已登录的 [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) 时自动启用；否则走 agent WebSearch `site:` |
+| Weibo / Zhihu | zh | ⏳ stub | — | 登录墙 / 反 bot → agent WebSearch `site:` |
 | Open web / X | any | — | — | agent WebSearch |
+
+**时区约定**：全链路 UTC —— N 天窗口边界、每条 item 的日期、`from..to` 头都是 UTC 口径；带本地偏移的源时间戳会先转 UTC 再取日期，`Window.contains` 对新发内容容忍 +1 天的时区偏移。
+
+### 小红书(可选,本地 bridge)
+
+小红书没有零 key 搜索路径(搜索接口要登录 cookie、请求签名按月轮换),引擎改为自动探测本机的
+[xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp):下载 release 二进制、扫码登录一次、保持运行(默认 `:18060`,可用 `XIAOHONGSHU_API_BASE` 覆盖)。`--diagnose` 显示 `bridge up` 后,`--lang zh/both` 即可拉到带真实点赞/收藏/评论和精确发布日期的小红书笔记;没有 bridge 则照旧走 agent 的 WebSearch 层。注意:笔记日期需要逐条 detail 调用(服务端起 headless 浏览器,每条约 5-15 秒),所以这个源每次返回少量但日期可靠的条目,总耗时由 `LASTDAYS_XHS_BUDGET` 秒(默认 25)封顶。
 
 参见 [`skills/lastdays/references/source-policy.md`](skills/lastdays/references/source-policy.md)，
 了解这一契约，以及如何把中文 stub 逐步改造成真正的 fetcher。

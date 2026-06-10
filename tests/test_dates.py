@@ -51,3 +51,14 @@ def test_recency():
     assert w.recency("2026-05-20") == 0.0
     assert w.recency(None) == 0.0
     assert 0.4 < w.recency("2026-05-25") < 0.6
+
+
+def test_to_datetime_normalizes_offsets_to_utc():
+    # 23:30 at -05:00 is 04:30 NEXT DAY in UTC — the rendered date must be UTC.
+    from lib.dates import to_datetime
+    dt = to_datetime("2026-06-07T23:30:00-05:00")
+    assert dt.strftime("%Y-%m-%d %H:%M %Z") == "2026-06-08 04:30 UTC"
+    # Z / naive / unix inputs stay UTC as before.
+    assert to_datetime("2026-06-08T04:30:00Z").hour == 4
+    assert to_datetime("2026-06-08 04:30:00").tzname() == "UTC"
+    assert to_datetime(1765168200).tzname() == "UTC"

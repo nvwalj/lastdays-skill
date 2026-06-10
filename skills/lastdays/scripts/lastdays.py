@@ -63,8 +63,17 @@ def _diagnose() -> int:
     for s in registry.all_sources():
         kind = "engine" if s.name in registry.ENGINE_SOURCES else "agent-web"
         status = "ok" if s.implemented else "stub"
-        need = " (needs key/cookie)" if s.requires_key else ""
-        print(f"  - {s.name:12} lang={s.lang}  {kind:9} [{status}]{need}")
+        # A bridge-gated source needs its local bridge, not a key/cookie — the
+        # bridge suffix below says so; the key/cookie tag would mislead.
+        need = " (needs key/cookie)" if s.requires_key and not s.bridge_probe else ""
+        bridge = ""
+        if s.bridge_probe:
+            bridge = (
+                " [bridge up -> engine]"
+                if s.bridge_probe(cfg)
+                else " [bridge down -> agent-web; start the local bridge + login]"
+            )
+        print(f"  - {s.name:12} lang={s.lang}  {kind:9} [{status}]{need}{bridge}")
     print(f"openai auth : {auth['source']}")
     has_gh = bool(cfg.get("GITHUB_TOKEN") or cfg.get("GH_TOKEN"))
     print(f"github token: {'set' if has_gh else 'not set (keyless, lower rate limit)'}")
@@ -76,6 +85,17 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
     requested = registry.resolve_names(sources_arg, lang)
     engine_targets = [n for n in requested if n in registry.ENGINE_SOURCES]
     web_layers = [n for n in requested if n not in registry.ENGINE_SOURCES]
+    # Bridge sources self-activate: a probe-passing LOCAL bridge (e.g. a running
+    # xiaohongshu-mcp with a logged-in session) promotes the source from the
+    # agent's WebSearch layer into the engine for this run. No bridge -> the
+    # source stays a web layer, exactly as before.
+    promoted: list[str] = []
+    for n in list(web_layers):
+        src = registry.get(n)
+        if src and src.bridge_probe and src.bridge_probe(config):
+            web_layers.remove(n)
+            engine_targets.append(n)
+            promoted.append(n)
 
     report = Report(
         topic=topic,
@@ -157,11 +177,24 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
     for name in web_layers:
         src = registry.get(name)
         if src and src.lang == "zh":
+            why = (
+                "local bridge not running (engine-capable; see --diagnose)"
+                if src.bridge_probe
+                else "Chinese source, not yet in engine"
+            )
             report.web_layers_requested.append(
-                f"{name} (site:{_ZH_DOMAINS.get(name, name)}) - Chinese source, not yet in engine"
+                f"{name} (site:{_ZH_DOMAINS.get(name, name)}) - {why}"
             )
         else:
             report.web_layers_requested.append(_LAYER_LABELS.get(name, name))
+    # A promoted bridge source that came back EMPTY (search failed, details
+    # timed out, nothing in-window) must not silently SHRINK coverage relative
+    # to a bridge-less run: restore its WebSearch fallback line.
+    for name in promoted:
+        if not report.items_by_source.get(name):
+            report.web_layers_requested.append(
+                f"{name} (site:{_ZH_DOMAINS.get(name, name)}) - bridge ran but returned nothing in-window; cover via WebSearch"
+            )
 
     total = sum(len(v) for v in report.items_by_source.values())
     if not engine_targets and not web_layers:

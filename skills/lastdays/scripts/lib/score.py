@@ -49,6 +49,9 @@ def engagement_raw(source: str, eng: dict) -> float | None:
         return _log(eng.get("volume"))
     if source == "bilibili":
         return 0.5 * _log(eng.get("views")) + 0.3 * _log(eng.get("danmaku")) + 0.2 * _log(eng.get("favorites"))
+    if source == "xiaohongshu":
+        # Collects (收藏) are XHS's strongest intent signal after likes.
+        return 0.45 * _log(eng.get("likes")) + 0.30 * _log(eng.get("collects")) + 0.25 * _log(eng.get("comments"))
     if source == "douyin":
         return _log(eng.get("hot_value"))
     total = sum(float(v or 0) for v in eng.values() if isinstance(v, (int, float)))

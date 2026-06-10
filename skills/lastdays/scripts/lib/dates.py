@@ -52,7 +52,10 @@ def to_datetime(ts) -> datetime | None:
     if ts is None or ts == "":
         return None
     if isinstance(ts, datetime):
-        return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        # Normalize aware datetimes to UTC (not just keep their offset): callers
+        # strftime the result into the item's date string, and a -05:00 instant
+        # would otherwise render the source's local date, not the UTC date.
+        return ts.astimezone(timezone.utc) if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
     if isinstance(ts, (int, float)):
         try:
             return datetime.fromtimestamp(float(ts), tz=timezone.utc)
@@ -70,7 +73,7 @@ def to_datetime(ts) -> datetime | None:
     for fmt in _ISO_FORMATS:
         try:
             dt = datetime.strptime(iso, fmt)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
         except ValueError:
             continue
     return None

@@ -1,13 +1,20 @@
-"""Reddit search (keyless), two-tier via the registry tier framework.
+"""Reddit search (keyless), three-tier via the registry tier framework.
 
 Tier "json" (quality 100): public ``search.json`` — carries real engagement
-(score, comments, upvote_ratio) but returns HTTP 403 from datacenter IPs.
-Tier "rss" (quality 40, degraded): ``search.rss`` — reachable where ``.json`` is
-403, but RSS only carries title/link/author/date, NOT engagement. Because it has
-no engagement to rank by, this tier additionally drops titles that don't actually
-match the query (otherwise "Flea market find" leaks in for query "Nvidia" just
-because both contain "market"). Items are flagged degraded so scoring/rendering
-never fake upvotes. If both tiers fail the source yields nothing and the agent
+(score, comments, upvote_ratio). Since ~2025 Reddit fingerprints the TLS
+handshake (JA3), so non-browser clients get HTTP 403 regardless of User-Agent —
+measured on residential IPs too, not just datacenter ones.
+Tier "oldweb" (quality 70): ``old.reddit.com/search`` HTML — server-rendered
+and NOT behind the JA3 wall (measured: 200 with real "3,822 points" where
+``.json`` is 403). Carries real score + comment counts + exact timestamps, so
+it is not flagged degraded; vs json it only lacks upvote_ratio and selftext.
+Parsed with stdlib regex over old.reddit's stable class names.
+Tier "rss" (quality 40, degraded): ``search.rss`` — last resort; RSS only
+carries title/link/author/date, NOT engagement. Because it has no engagement to
+rank by, this tier additionally drops titles that don't actually match the
+query (otherwise "Flea market find" leaks in for query "Nvidia" just because
+both contain "market"). Items are flagged degraded so scoring/rendering never
+fake upvotes. If all tiers fail the source yields nothing and the agent
 supplements via WebSearch ``site:reddit.com``.
 """
 
@@ -85,6 +92,84 @@ def _from_json(query: str, window: Window, *, env: dict, depth: str = "default")
     return items
 
 
+# --- tier "oldweb": old.reddit.com server-rendered search ---------------------
+
+_OLD_TITLE_RE = re.compile(
+    r'href="(https://old\.reddit\.com/r/[^"]+/comments/[^"]+)"\s+class="search-title[^"]*"\s*>(.*?)</a>',
+    re.S,
+)
+_OLD_SCORE_RE = re.compile(r'class="search-score[^"]*">(-?[\d,]+)\s+point')
+_OLD_COMMENTS_RE = re.compile(r'class="search-comments[^"]*"\s*>([\d,]+)\s+comment')
+_OLD_TIME_RE = re.compile(r'<time[^>]*datetime="([^"]+)"')
+_OLD_AUTHOR_RE = re.compile(r'class="author[^"]*"[^>]*>([^<]+)</a>')
+_OLD_SUB_RE = re.compile(r'class="search-subreddit-link[^"]*"[^>]*>r/([^<]+)</a>')
+
+
+def _old_int(text: str | None) -> int | None:
+    return to_int(text.replace(",", "")) if text else None
+
+
+def _from_old_html(query: str, window: Window, *, env: dict, depth: str = "default") -> list[Item]:
+    """Tier 'oldweb' (quality 70): old.reddit HTML with real score/comments."""
+    limit = DEPTH.get(depth, 25)
+    url = (
+        f"https://old.reddit.com/search?q={quote_plus(query)}"
+        f"&sort=relevance&t={_t_param(window.days)}&limit={limit}"
+    )
+    text = http.get_text(url, timeout=15, accept="text/html, */*")
+    if not text:
+        return []
+    items: list[Item] = []
+    # Each result card opens with its post fullname; split is anchor enough.
+    for raw in text.split('data-fullname="t3_')[1:]:
+        pid = raw.split('"', 1)[0]
+        title_m = _OLD_TITLE_RE.search(raw)
+        if not title_m:
+            continue
+        title = strip_html(title_m.group(2))
+        if not title:
+            continue
+        score_m = _OLD_SCORE_RE.search(raw)
+        com_m = _OLD_COMMENTS_RE.search(raw)
+        ts = None
+        date = None
+        time_m = _OLD_TIME_RE.search(raw)
+        if time_m:
+            try:
+                dt = datetime.datetime.fromisoformat(time_m.group(1).replace("Z", "+00:00"))
+                ts = dt.timestamp()
+                date = dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+        author_m = _OLD_AUTHOR_RE.search(raw)
+        sub_m = _OLD_SUB_RE.search(raw)
+        engagement = {}
+        if score_m:
+            engagement["score"] = _old_int(score_m.group(1))
+        if com_m:
+            engagement["comments"] = _old_int(com_m.group(1))
+        items.append(
+            Item(
+                source="reddit",
+                lang="en",
+                title=title,
+                # Canonical www host so dedupe matches items from the json tier.
+                url=title_m.group(1).replace("https://old.reddit.com/", "https://www.reddit.com/", 1),
+                author=author_m.group(1) if author_m else None,
+                container=f"r/{sub_m.group(1)}" if sub_m else None,
+                date=date,
+                ts=ts,
+                engagement=engagement,
+                snippet="",  # old.reddit search cards carry no selftext
+                relevance=0.6,
+                item_id=f"rd{pid}",
+            )
+        )
+        if len(items) >= limit:
+            break
+    return items
+
+
 _ENTRY_RE = re.compile(r"<entry>(.*?)</entry>", re.S)
 
 
@@ -155,6 +240,7 @@ registry.register(
         "en",
         tiers=(
             registry.Tier(_from_json, quality=100, degraded=False, label="json"),
+            registry.Tier(_from_old_html, quality=70, degraded=False, label="oldweb"),
             registry.Tier(
                 _from_rss, quality=40, degraded=True, label="rss",
                 note="no engagement; relevance-filtered",

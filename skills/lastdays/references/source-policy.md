@@ -9,7 +9,7 @@
 | Dev.to | en | Python engine (articles API, tag search) | reactions, comments | ✅ implemented, keyless |
 | Stack Overflow | en | Python engine (search/advanced API) | score, answers, views | ✅ implemented, keyless — server-side `fromdate` window; tag-gated, technical topics |
 | GitHub | en | Python engine (Search API) | comments, reactions | ✅ implemented, keyless* |
-| Reddit | en | Python engine (`.json`, RSS fallback) | score, comments (json only) | ✅ implemented, keyless** |
+| Reddit | en | Python engine (3 tiers: `.json` → old.reddit HTML → RSS) | score, comments (json + oldweb) | ✅ implemented, keyless** |
 | Lemmy | en | Python engine (search API, `Top<period>` sort) | score, comments | ✅ implemented, keyless — federated Reddit alt; zero-key complement when Reddit 403s (env `LEMMY_INSTANCE`) |
 | Bluesky | en | Python engine (searchPosts, 2-host tier) | likes, reposts, replies | ✅ implemented, keyless — AT Proto; structured-engagement complement to the X/WebSearch layer |
 | Polymarket | en | Python engine (Gamma API) | volume | ✅ implemented, keyless** |
@@ -18,7 +18,7 @@
 | Douyin 抖音 | zh | Python engine (hot-search board) | hot_value, rank | ✅ implemented, keyless — see note**** |
 | Weibo 微博 | zh | agent WebSearch (`site:weibo.com`) | — | ⏳ stub — login-walled*** |
 | Zhihu 知乎 | zh | agent WebSearch (`site:zhihu.com`) | — | ⏳ stub — anti-bot*** |
-| Xiaohongshu 小红书 | zh | agent WebSearch (`site:xiaohongshu.com`) | — | ⏳ stub — login-walled |
+| Xiaohongshu 小红书 | zh | Python engine via LOCAL bridge (xiaohongshu-mcp REST on `:18060`), else agent WebSearch | likes, collects, comments | ✅ implemented — bridge-gated: `Source.bridge_probe` checks `GET /api/v1/login/status`; probe passes → promoted to engine for that run, else stays a web layer. Dates come from per-note `feeds/detail` calls (`note.time`, epoch ms) under a `LASTDAYS_XHS_BUDGET`-second budget — undetailed notes are dropped, never guess-dated. `publish_time` filter accepts only 不限/一天内/一周内/半年内 (NO 一个月内) |
 | Open web / X | en/any | agent WebSearch | — | covered by the agent |
 
 \*\*\* Probed 2026-05-30: **Zhihu** returns `40352` (风控/needs login) and requires an
@@ -39,7 +39,7 @@ events, often empty for niche/evergreen topics). Entries carry `event_time`, so
 they are still window-filtered.
 
 \* GitHub is keyless but unauthenticated search is rate-limited (~10 req/min); set `GITHUB_TOKEN` to raise it.
-\*\* Reddit uses the **tier fallback framework** (see below): tier `json` (quality 100, real score/comments) then tier `rss` (quality 40, degraded). `.json` returns HTTP 403 from datacenter IPs; the runner then tries `search.rss`, which IS reachable but carries **no engagement**. Because the RSS tier can't rank by upvotes, it additionally drops titles that don't match the query (a relevance gate) so noise like "Flea market find" can't ride in on the word "market". RSS items are tagged `metadata.degraded=true` + `metadata.tier=rss`, scored without upvotes (never faked), and marked `⚠ degraded:rss` in the evidence. Residential IPs get the richer `.json` path. Polymarket's public API can also 403 from some IPs; it degrades to `[]` and records the error. HN multi-word queries use Algolia `optionalWords` so phrases like "US stock market" don't AND themselves to zero.
+\*\* Reddit uses the **tier fallback framework** (see below): tier `json` (quality 100, real score/comments + upvote_ratio) → tier `oldweb` (quality 70, old.reddit HTML, real score/comments, not degraded) → tier `rss` (quality 40, degraded). Reddit JA3-fingerprints the TLS handshake, so `.json` 403s for non-browser clients even on residential IPs (measured 2026-06); `old.reddit.com/search` HTML is server-rendered outside that wall and still carries real engagement, leaving `search.rss` — reachable but with **no engagement** — as the last resort. Because the RSS tier can't rank by upvotes, it additionally drops titles that don't match the query (a relevance gate) so noise like "Flea market find" can't ride in on the word "market". RSS items are tagged `metadata.degraded=true` + `metadata.tier=rss`, scored without upvotes (never faked), and marked `⚠ degraded:rss` in the evidence. Residential IPs get the richer `.json` path. Polymarket's public API can also 403 from some IPs; it degrades to `[]` and records the error. HN multi-word queries use Algolia `optionalWords` so phrases like "US stock market" don't AND themselves to zero.
 
 ## Tier fallback framework
 

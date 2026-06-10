@@ -91,15 +91,33 @@ quality). Signals are **hypotheses to validate** by talking to users, not proven
 | Dev.to | en | ✅ tag API | reactions, comments | keyless — dev blog posts, tag-search + on-topic filter |
 | Stack Overflow | en | ✅ search API | score, answers, views | keyless (~300/day) — strict `fromdate` window, tag-gated; technical topics |
 | GitHub | en | ✅ Search API | comments, reactions | keyless (`GITHUB_TOKEN` lifts limit) |
-| Reddit | en | ✅ public `.json` | score, comments | keyless (403 on datacenter IPs → agent supplements) |
+| Reddit | en | ✅ 3-tier: `.json` → old.reddit HTML → RSS | score, comments | keyless — Reddit JA3-fingerprints non-browser TLS so `.json` often 403s; the old.reddit HTML tier still returns REAL scores/comments, RSS is the engagement-less last resort |
 | Lemmy | en | ✅ search API | score, comments | keyless — federated Reddit alt; `Top<period>` sort, env `LEMMY_INSTANCE` |
 | Bluesky | en | ✅ searchPosts | likes, reposts, replies | keyless — AT Proto; structured-engagement complement to the X/WebSearch layer |
 | Polymarket | en | ✅ Gamma | volume | keyless (403 on datacenter IPs → agent supplements) |
 | Kalshi | en | ✅ search API | volume (contracts) | keyless — CFTC-regulated US prediction market; odds quoted as a live snapshot dated at fetch time |
 | Bilibili | zh | ✅ wbi search | views, danmaku, favorites | keyless (anonymous buvid3 + wbi md5 sign) |
 | Douyin | zh | ✅ hot-search board | hot_value, rank | keyless — trending-board match, not full search |
-| Weibo / Zhihu / Xiaohongshu | zh | ⏳ stub | — | login-walled / anti-bot → agent WebSearch `site:` |
+| Xiaohongshu | zh | ✅ local bridge | likes, collects, comments | optional — auto-activates when a logged-in [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) runs locally; otherwise agent WebSearch `site:` |
+| Weibo / Zhihu | zh | ⏳ stub | — | login-walled / anti-bot → agent WebSearch `site:` |
 | Open web / X | any | — | — | agent WebSearch |
+
+**Timezone convention:** everything is UTC end-to-end — the N-day window boundaries,
+every item date, and the `from..to` header. Source timestamps arriving with a local
+offset are converted to UTC before dating, and `Window.contains` tolerates +1 day of
+skew for freshly-posted items.
+
+### Xiaohongshu via local bridge (optional)
+
+XHS has no keyless search path (login-gated API, rotating request signing), so the
+engine instead auto-detects a locally running
+[xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp): install its release
+binary, scan the login QR once, keep it running (default `:18060`, override with
+`XIAOHONGSHU_API_BASE`). When `--diagnose` shows `bridge up`, `--lang zh/both` runs
+pull real XHS notes with likes/collects/comments and exact post dates; without the
+bridge the platform falls back to the agent's WebSearch layer. Note dates require a
+per-note detail call (a headless browser server-side, ~5-15s each), so this source
+returns a few well-dated items, capped by `LASTDAYS_XHS_BUDGET` seconds (default 25).
 
 See [`skills/lastdays/references/source-policy.md`](skills/lastdays/references/source-policy.md)
 for the contract and a step-by-step guide to turning a Chinese stub into a real fetcher.

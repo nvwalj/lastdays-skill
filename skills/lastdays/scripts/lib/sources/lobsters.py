@@ -11,7 +11,7 @@ genuine engagement, rather than an arbitrary-query search.
 from __future__ import annotations
 
 from .. import http, registry
-from ..dates import Window
+from ..dates import Window, to_datetime
 from ..schema import Item
 from .base import is_on_topic, strip_html, to_int
 
@@ -40,8 +40,11 @@ def fetch(query: str, window: Window, *, env: dict, depth: str = "default") -> l
         title = strip_html(s.get("title", ""))
         if not title:
             continue
-        created = s.get("created_at", "")  # ISO 8601 with tz, e.g. 2026-06-07T...
-        date = created[:10] if created else None
+        # ISO 8601 with the site's OWN offset (e.g. ...-05:00) — convert to UTC
+        # before taking the date; a bare [:10] slice would keep the local date
+        # and disagree with the engine's UTC window convention at day edges.
+        created_dt = to_datetime(s.get("created_at"))
+        date = created_dt.strftime("%Y-%m-%d") if created_dt else None
         sid = s.get("short_id", "")
         items.append(
             Item(

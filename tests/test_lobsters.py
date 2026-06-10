@@ -57,3 +57,18 @@ def test_dates_parsed_for_window_filtering(monkeypatch):
     w = Window(days=7, now=datetime(2026, 6, 7, tzinfo=timezone.utc))
     kept = [i.title for i in normalize.filter_window(items, w)]
     assert kept == ["New linux post"]  # window filter drops the old one
+
+
+def test_lobsters_date_is_utc_not_site_local(monkeypatch):
+    # created_at carries the site's own -05:00 offset; the item date must be
+    # the UTC date (next day here), matching the engine's UTC window.
+    from datetime import datetime, timezone
+    from lib.dates import Window
+    from lib.sources import lobsters
+    story = {"title": "Nvidia ships", "short_id": "x1", "score": 5, "comment_count": 2,
+             "url": "https://example.com", "created_at": "2026-06-07T23:30:00-05:00",
+             "submitter_user": "al", "tags": []}
+    monkeypatch.setattr(lobsters.http, "get", lambda *a, **k: [story])
+    w = Window(days=7, now=datetime(2026, 6, 9, tzinfo=timezone.utc))
+    items = lobsters.fetch("Nvidia", w, env={})
+    assert items and items[0].date == "2026-06-08"

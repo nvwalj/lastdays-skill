@@ -60,6 +60,11 @@ class Source:
     requires_key: bool = False                  # needs cookies/token not yet wired
     implemented: bool = True                    # False for stub placeholders
     aliases: tuple = field(default_factory=tuple)
+    # Optional local-bridge gate: probe(env) -> bool. A source carrying one is
+    # promoted to an engine source at runtime ONLY when the probe passes (e.g.
+    # xiaohongshu via a local xiaohongshu-mcp); otherwise it stays in the
+    # agent's WebSearch layer. Keeps ENGINE_SOURCES static and honest.
+    bridge_probe: Optional[Callable] = None
 
     def ordered_tiers(self) -> list:
         """Tiers highest-quality first. A single-fetch source becomes one tier."""

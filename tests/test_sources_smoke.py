@@ -5,12 +5,20 @@ from lib.dates import Window
 
 def test_zh_stubs_return_empty_and_are_marked():
     w = Window.from_days(30)
-    for name in ("weibo", "xiaohongshu", "zhihu"):
+    for name in ("weibo", "zhihu"):
         src = registry.get(name)
         assert src is not None
         assert src.lang == "zh"
         assert src.implemented is False
         assert src.fetch("anything", w, env={}) == []
+
+
+def test_xiaohongshu_is_bridge_gated_not_stub():
+    # Implemented now, but engine-run ONLY when its local-bridge probe passes.
+    src = registry.get("xiaohongshu")
+    assert src.implemented is True
+    assert src.bridge_probe is not None
+    assert "xiaohongshu" not in registry.ENGINE_SOURCES   # static set stays honest
 
 
 def test_en_sources_registered_and_callable():
