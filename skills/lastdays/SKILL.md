@@ -3,7 +3,7 @@ name: lastdays
 description: >-
   Research what people actually said about a topic over the last N days (default
   30, configurable). A zero-key Python engine pulls Reddit, Hacker News, GitHub,
-  Polymarket, Kalshi, Lobsters, Stack Overflow, Lemmy, Bluesky, Google News, and Chinese sources (Bilibili, Douyin) with real
+  Polymarket, Kalshi, Lobsters, Stack Overflow, Lemmy, Bluesky, Google News, arXiv, and Chinese sources (Bilibili, Douyin) with real
   engagement (upvotes, points, comments, volume) and a strict date window; you
   supplement the open web and X via WebSearch and
   synthesize one grounded, cited brief. Use for recent-trend research, "what's
@@ -53,7 +53,7 @@ SKILL_DIR="<absolute dir of this SKILL.md>"
 python3 "$SKILL_DIR/scripts/lastdays.py" "<TOPIC>" --days <N> --lang <en|zh|both> --emit compact
 ```
 
-The engine prints an `EVIDENCE FOR SYNTHESIS` block (ranked Reddit / Hacker News / GitHub / Polymarket / Kalshi / Lobsters / Stack Overflow / Lemmy / Bluesky items, plus Google News articles — and Bilibili / Douyin under `--lang zh`/`both` — with real engagement, strictly inside the window; Google News is a `⚠ degraded:rss` layer with no engagement, ranked on relevance+recency only) and a `WEB LAYERS TO FILL` list. Each item line shows `score=` and `rel=` (relevance 0–0.9); prefer high-`rel` items and treat low-`rel` ones (engine kept them but flagged weak) with skepticism. Read the evidence; **do not** paste it back verbatim. Run `--diagnose` once if you want to see which sources are live vs stub.
+The engine prints an `EVIDENCE FOR SYNTHESIS` block (ranked Reddit / Hacker News / GitHub / Polymarket / Kalshi / Lobsters / Stack Overflow / Lemmy / Bluesky items, plus Google News articles and arXiv papers — and Bilibili / Douyin under `--lang zh`/`both` — with real engagement, strictly inside the window; Google News and arXiv are `⚠ degraded` layers with no engagement, ranked on relevance+recency only, and arXiv is legitimately empty for non-research topics) and a `WEB LAYERS TO FILL` list. A source header may carry `⚠ no strongly-relevant results in-window` (every item is a weak/floor match — corroborate or omit), and a global `NOTE` appears when the whole engine pool is weak. Each item line shows `score=` and `rel=` (relevance 0–0.9); prefer high-`rel` items and treat low-`rel` ones (engine kept them but flagged weak) with skepticism. Read the evidence; **do not** paste it back verbatim. Run `--diagnose` once if you want to see which sources are live vs stub.
 
 ## Step 3 — Fill the web / X / Chinese layers yourself
 
@@ -75,7 +75,7 @@ Read `references/synthesis-rules.md` and follow it. In short: first line is the 
 
 ## Source switches & Chinese status
 
-- `--sources reddit,hackernews,github,polymarket,kalshi,lobsters,googlenews` — pick a subset (aliases: `hn`, `gh`, `pm`, `ks`, `r`, `lob`, `gn`/`news`).
+- `--sources reddit,hackernews,github,polymarket,kalshi,lobsters,googlenews,arxiv` — pick a subset (aliases: `hn`, `gh`, `pm`, `ks`, `r`, `lob`, `gn`/`news`, `arx`/`papers`).
 - `--lang zh` routes the five Chinese platforms to your WebSearch layer; `--lang both` adds them on top of the English engine sources.
 - `--allow-undated` keeps items with no detectable date (off by default).
 - You write the synthesis here in chat (zero cost). `--synthesize` (engine-side LLM) is for headless/cron only - do not use it in this interactive flow.

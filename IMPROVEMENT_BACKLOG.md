@@ -12,6 +12,19 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 6 — DONE: arXiv research source (backlog #12); #8 deferred with reasoning.**
+  Added `sources/arxiv.py` (`export.arxiv.org/api/query`, Atom) as a keyless **degraded**
+  engine source — primary CS/ML/physics research, the layer news/social/forum miss. Phrase
+  `all:"<q>"` search, gated on title OR abstract, window-rechecked on `published`, authors
+  collapsed to "First et al.", no engagement (never faked). 7 fixture tests; 238 green;
+  live: "large language model agents" → 29 papers (rel 0.90), "taylor swift tour" → 0
+  (honest empty). Registered + ENGINE_SOURCES + docs (SKILL.md, source-policy.md). 12 EN
+  engine sources now. **#8 (stemming/synonym) deferred on purpose:** the gaps that
+  motivated it ("model context protocol"↔MCP, "rust async runtime") are acronym/semantic,
+  NOT stemming-fixable; the high-value acronym map is arbitrary/unscalable without
+  embeddings (no deps); and it touches shared relevance code (gate-noise regression risk).
+  Re-scoped #8 below to the genuinely safe slice (phrase-adjacency ranking bonus).
+
 - **2026-06-11 · iteration 5 — DONE: no-strong-results signal + selective URL canonicalization (backlog #9).**
   (a) `render.py`: a source whose best item is below the no-match floor ceiling
   (max relevance < 0.4) gets a per-source `⚠ no strongly-relevant results` flag, and
@@ -95,11 +108,11 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | ~~5~~ | precision | **✅ DONE 2026-06-11 (iteration 4)** — `base.adaptive_topic_gate()` wired into the orchestrator for the 3 ungated full-text sources (hackernews/github/polymarket); ≥2-token queries return on-topic subset when ≥3 remain, else keep all (recall). Audit found the other 5 listed sources already gate at fetch. xiaohongshu (bridge source) left as-is. Live: "open source LLM" HN 27→13. | high | small | med |
 | ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
 | 7 | reddit | **Opt-in official-OAuth Reddit tier** gated behind `REDDIT_CLIENT_ID`/`SECRET` env (top-priority tier ONLY when present). `client_credentials` → `oauth.reddit.com/r/<sub>/search` for full engagement at 100 QPM. Engine stays zero-key by default; dormant unless the user opts in. The only ToS-clean live-complete-engagement path. | high | med | low |
-| 8 | precision | **Phrase/bigram adjacency bonus + inlined Porter stemmer in `base.py`.** Small additive bonus when consecutive query tokens are adjacent in the title (contiguous "web scraping" beats scattered), capped below a true full match. Inline a ~200-line public-domain Porter stemmer (zero deps) on query+title tokens for recall. Leave the CJK bigram path unchanged. | high | med | **med** |
+| 8 | precision | **RE-SCOPED 2026-06-11 — do the SAFE slice only.** Original (Porter stemmer + acronym map) deferred: observed gaps (MCP↔"model context protocol", "rust async runtime") are acronym/semantic, NOT stemming-fixable, and an acronym map is arbitrary/unscalable without embeddings (no deps). SAFE slice worth doing: a **phrase/bigram adjacency bonus** in `title_relevance` only (contiguous query tokens beat scattered), capped below a full match — ranking-only, does NOT touch the `is_on_topic` gate, so no noise-regression risk. Optionally a *very* light plural/tense normalizer (-s/-es/-ed) with length guards, but only after measuring it doesn't loosen the gate. | med | small | low |
 | ~~9~~ | precision | **✅ DONE 2026-06-11 (iteration 5)** — (a) per-source `⚠ no strongly-relevant results` flag + global NOTE when max relevance < 0.4 (`render.py`). (b) `canonical_url` strips only tracking params + unfolds m./amp. hosts + `/amp`, keeps content params (fixes `?v=`/`?id=` over-collapse). 10 new tests. | med | small | low |
 | 10 | reddit | **Formalize Reddit `.rss` as the honest degraded FLOOR tier** (`www.reddit.com/r/<sub>/search.rss?...` + site-wide, via `get_text`; Atom parse; `degraded=true`, no engagement). Guarantees the engine never returns zero Reddit results when PullPush/Arctic-Shift/JSON are down. (Partly exists; make it the explicit last tier.) | med | small | low |
 | 11 | speed | **Conditional GET (ETag / If-Modified-Since + 304) layered on the day cache.** Persist last ETag + Last-Modified per URL in `cache.py`; on a cache MISS send `If-None-Match`/`If-Modified-Since`; catch `HTTPError` code 304 and serve the cached body. Saves payload transfer cross-day + for non-day-cached sources. Scope to sources that actually return validators. | med | med | low |
-| 12 | new-source | **arXiv source** for research/ML topics (`export.arxiv.org/api/query?search_query=all:<q>&sortBy=submittedDate&sortOrder=descending&max_results=50`, Atom). Window-filter on `published`. Degraded (no engagement). Etiquette ≤1 req/3s single connection; sporadic 429s since ~Feb 2026 (engine backs off). | med | small | low |
+| ~~12~~ | new-source | **✅ DONE 2026-06-11 (iteration 6)** — `sources/arxiv.py`, degraded Atom source, phrase `all:"<q>"` search, title-OR-abstract gate, window-rechecked. Live: 29 papers for "large language model agents". | med | small | low |
 | 13 | new-source | **Bing News RSS** (`www.bing.com/news/search?q=<q>&format=rss`) as a 2nd mainstream corroborator; dedupe against Google News by normalized URL/title. Degraded. | med | small | low |
 | 14 | speed | **Keep-alive connection reuse within paginated same-host sources** (Algolia/HN pages, multi-page GitHub) via a module-local, per-thread `http.client.HTTPSConnection` (NOT a global pool — that reinvents urllib3). Drops repeated TCP+TLS handshakes. | med | med | **med** |
 | 15 | new-source | **Mastodon hashtag-timeline source** (`mastodon.social/api/v1/timelines/tag/<tag>?limit=40`). Real `favourites/reblogs/replies` counts. CAVEAT: free-text `/api/v2/search` returns empty statuses without a token — only the hashtag-timeline path is keyless. Register lower-confidence so fresh 0-engagement posts don't distort normalization. | med | med | **med** |
