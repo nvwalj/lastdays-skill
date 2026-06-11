@@ -141,3 +141,41 @@ def title_relevance(query: str, text: str) -> float:
     if hits == len(uniq):
         return 0.9
     return round(0.2 + 0.4 * (hits / len(uniq)), 3)  # partial: below a full match
+
+
+def meaningful_token_count(query: str) -> int:
+    """How many distinct topic tokens the query carries — EN meaningful words, or
+    CJK character bigrams. 1 means a single concept (recall matters, don't gate);
+    >=2 means is_on_topic can safely require real coverage."""
+    if not query:
+        return 0
+    if _CJK_RE.search(query.replace(" ", "")):
+        return len(_cjk_bigrams(query))
+    uniq, _ = _query_hits(query, query)
+    return len(uniq)
+
+
+GATE_MIN_FILL = 3
+
+
+def adaptive_topic_gate(query: str, items: list, text_of=lambda it: it.title,
+                        *, min_fill: int = GATE_MIN_FILL) -> list:
+    """Adaptively drop off-topic items from a BROAD full-text source.
+
+    The tag/handle sources (Stack Exchange, Dev.to, Lemmy, Bluesky, Kalshi) gate
+    themselves at fetch. The broad full-text sources (Hacker News, GitHub,
+    Polymarket) match server-side over body text too, so they can return items
+    whose TITLE is irrelevant — historically floored (kept but sunk). This applies
+    the same `is_on_topic` gate to their output, but only when it is safe to:
+
+    - Single-token / sub-bigram queries pass through untouched (one weak word is
+      all the recall there is; a hard gate would gut it).
+    - For >=2-token queries, the on-topic subset is returned ONLY when it has
+      >=min_fill items. A thin/niche topic with few on-topic hits keeps ALL its
+      items (recall over precision) — the engine never empties a source whose
+      weak matches are the only thing it found.
+    """
+    if meaningful_token_count(query) < 2:
+        return items
+    on = [it for it in items if is_on_topic(query, text_of(it))]
+    return on if len(on) >= min_fill else items

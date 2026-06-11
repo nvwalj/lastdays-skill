@@ -12,6 +12,22 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 4 — DONE: adaptive precision gate for multi-word queries (backlog #5).**
+  Audit first overturned the scope: 5 of the 8 listed sources (stackexchange, devto,
+  lemmy, bluesky, kalshi) ALREADY hard-gate with `is_on_topic` at fetch — their
+  `NO_MATCH_FLOOR` is only a relevance floor for *already-on-topic* items. Only the 3
+  broad server-side full-text sources (hackernews, github, polymarket) floored without
+  gating. Added `base.adaptive_topic_gate()` + `meaningful_token_count()`, wired into
+  the orchestrator (`lastdays.py`) for those 3 only — kept OUT of the source fetch so
+  the source unit tests (which assert floored items are kept) stay valid. Rule: ≥2-token
+  queries return the on-topic subset only when it has ≥3 items, else keep all (recall on
+  thin topics). Live: "open source LLM" HN 27→13 (dropped 14 noise, kept 13 on-topic);
+  pure-noise queries ("web scraping anti-bot bypass": 0 on-topic) correctly keep all —
+  that case is backlog #9's banner, not this gate. 7 new tests; 224 green.
+  **Reinforced #8:** "model context protocol" / "rust async runtime" had 0 *title*
+  matches (acronym/phrasing gaps) → stemming/synonym/acronym expansion (#8) would let
+  the gate help there too.
+
 - **2026-06-11 · iteration 3 — DONE: cross-source near-duplicate clustering (backlog #4).**
   `normalize.dedupe()` now runs a 2nd pass after the exact URL/title pass: token-set
   Jaccard (EN) / char-trigram Jaccard (CJK) at `NEAR_DUP_JACCARD=0.6`, keeping the
@@ -64,7 +80,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | 2 | new-source | **HN: switch fully to Algolia `search_by_date` with native epoch date window + server-side `points>` gate.** `hn.algolia.com/api/v1/search_by_date?query=&tags=story&numericFilters=created_at_i>{epoch},points>{n}`. (Largely already in place — verify/strengthen; optionally merge a relevance-sorted `/search` pass deduped by objectID for popular older hits.) | high | med | low |
 | 3 | precision | **IDF-aware BM25F relevance in `base.py` (replace flat term-coverage).** Approximate IDF from doc-frequency across the CURRENT fetched candidate pool (no corpus needed) so rare terms ("teradyne") outweigh common ones ("market"). Length-normalize title-TF vs body/tags-TF, title boost ~3×, one saturation curve (k1~1.4, b~0.4). Keep output in the existing 0..0.9 range so `score.py` weights stay valid. | high | med | **med** |
 | ~~4~~ | precision | **✅ DONE 2026-06-11 (iteration 3)** — token-set (EN) / char-trigram (CJK) Jaccard ≥0.6 near-dup pass in `normalize.dedupe()`, after the exact pass, highest-score copy wins; short-title guard against over-merge. `lastdays.py` refactored to reuse it. Live: merged 7 extra cross-source dups on "OpenAI" 10d. | high | med | low |
-| 5 | precision | **Adaptive hard precision gate: unify `is_on_topic` across the ~8 sources still using bare `NO_MATCH_FLOOR`** (hackernews, github, polymarket, kalshi, lemmy, bluesky, stackexchange, xiaohongshu). For ≥2-meaningful-token queries, DROP zero-hit items instead of flooring them; keep the floor for single-token queries (recall). Make it result-count-adaptive so thin niche topics still return something. | high | small | **med** |
+| ~~5~~ | precision | **✅ DONE 2026-06-11 (iteration 4)** — `base.adaptive_topic_gate()` wired into the orchestrator for the 3 ungated full-text sources (hackernews/github/polymarket); ≥2-token queries return on-topic subset when ≥3 remain, else keep all (recall). Audit found the other 5 listed sources already gate at fetch. xiaohongshu (bridge source) left as-is. Live: "open source LLM" HN 27→13. | high | small | med |
 | ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
 | 7 | reddit | **Opt-in official-OAuth Reddit tier** gated behind `REDDIT_CLIENT_ID`/`SECRET` env (top-priority tier ONLY when present). `client_credentials` → `oauth.reddit.com/r/<sub>/search` for full engagement at 100 QPM. Engine stays zero-key by default; dormant unless the user opts in. The only ToS-clean live-complete-engagement path. | high | med | low |
 | 8 | precision | **Phrase/bigram adjacency bonus + inlined Porter stemmer in `base.py`.** Small additive bonus when consecutive query tokens are adjacent in the title (contiguous "web scraping" beats scattered), capped below a true full match. Inline a ~200-line public-domain Porter stemmer (zero deps) on query+title tokens for recall. Leave the CJK bigram path unchanged. | high | med | **med** |

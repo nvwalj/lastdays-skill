@@ -34,6 +34,7 @@ from lib import providers  # noqa: E402
 from lib import render as render_mod  # noqa: E402
 from lib import sources as _sources  # noqa: E402,F401  import side effect: registers sources
 from lib.schema import Report  # noqa: E402
+from lib.sources import base as base_mod  # noqa: E402  adaptive_topic_gate
 
 _ZH_DOMAINS = {
     "weibo": "weibo.com",
@@ -50,6 +51,20 @@ _LAYER_LABELS = {
 # abandoned (recorded as a timeout error) rather than hanging the whole run.
 # Sized above a normal single-source fetch+retry (~20s) but well below "forever".
 ENGINE_DEADLINE = 45
+
+# Sources that search server-side over body text (not tags/handles), so they can
+# return items whose title is off-topic. The engine applies an adaptive is_on_topic
+# gate to their output (see base.adaptive_topic_gate). Everything else either gates
+# itself at fetch (tag/handle sources) or has no free-text noise (prediction-board).
+_GATED_FULLTEXT = frozenset({"hackernews", "github", "polymarket"})
+
+
+def _gate_text(name: str):
+    """The text the adaptive gate matches against, per source. GitHub carries the
+    topic word in the repo name as often as the title, so include the repo."""
+    if name == "github":
+        return lambda it: f"{it.title} {it.container or ''}"
+    return lambda it: it.title
 
 
 def _now_iso() -> str:
@@ -141,9 +156,15 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
                 raw[name] = []
         ex.shutdown(wait=False)  # don't block on the wedged thread(s)
 
-    # per-source: strict window filter -> score -> rank
+    # per-source: strict window filter -> adaptive topic gate -> score -> rank
     for name in engine_targets:
         items = normalize.filter_window(raw.get(name, []), window, allow_undated=allow_undated)
+        # Broad full-text sources (HN/GitHub/Polymarket) match server-side over
+        # body text, so they can return title-irrelevant items that were only
+        # floored. Drop those for multi-word queries when enough on-topic items
+        # remain (the tag/handle sources already gate themselves at fetch).
+        if name in _GATED_FULLTEXT:
+            items = base_mod.adaptive_topic_gate(topic, items, _gate_text(name))
         score.score_items(items, window)
         report.items_by_source[name] = score.rank(items)
 
