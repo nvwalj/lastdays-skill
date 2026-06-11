@@ -12,6 +12,19 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 10 — #3 (IDF relevance) measured HARMFUL → rejected; full source audit clean.**
+  Measured before building: IDF over a per-query candidate pool is unsound because the pool is
+  *query-biased* (search returns query-matching items), so the query's CORE term has high DF →
+  low IDF → gets demoted. Concrete: "tesla stock market" (pool 23/33 Tesla items) → IDF demotes a
+  Tesla item (0.33→0.31) and promotes a generic "Daily Stock Digest" that isn't about Tesla.
+  Building it would worsen ranking. Rejected (the back-out guard worked). Then ran a **live
+  correctness audit** of all 14 sources (en `artificial intelligence` + zh `人工智能`): every
+  source returns well-formed, in-window (UTC), engagement-bearing items with valid URLs; zero
+  errors; lobsters/devto/douyin empty are legitimate (hot-list/tag/trending boards). No bugs.
+  **Three consecutive planned items now failed validation (Mastodon, Reddit-OAuth, IDF) and the
+  audit found nothing to fix — the high-value backlog is exhausted.** Remaining items (#2/#10/#13/
+  #17/#18/#19) are low-value polish; building them for its own sake would be over-engineering.
+
 - **2026-06-11 · iteration 9 — DONE: synthesis-rules coherence; #15 (Mastodon) + #7 (Reddit OAuth) both rejected on validation.**
   Probe-first, and both pre-planned additions failed the bar: **Mastodon** keyless hashtag
   timelines are low-quality (live: #webscraping 3/20 with any engagement; #python/#webscraping
@@ -140,7 +153,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 |---|-----|------|-----|-----|------|
 | ~~1~~ | reddit | **REVISED 2026-06-11 (live-probed) — premise dead, DEPRIORITIZED (see Status log).** PullPush frozen (newest item 2025-05-19); Arctic-Shift needs `subreddit`/`author` (no Reddit-wide) + name-prefix-only subreddit search; and the `oldweb` tier already does Reddit-wide real-engagement search. *Low-pri remnant:* Arctic-Shift (`posts/search?subreddit=<sub>&query=<q>&after=<ISO>&sort=desc`) as a per-subreddit resilience tier seeded from `oldweb`-surfaced subreddits, only if old.reddit starts blocking. | low | med | low |
 | 2 | new-source | **HN: switch fully to Algolia `search_by_date` with native epoch date window + server-side `points>` gate.** `hn.algolia.com/api/v1/search_by_date?query=&tags=story&numericFilters=created_at_i>{epoch},points>{n}`. (Largely already in place — verify/strengthen; optionally merge a relevance-sorted `/search` pass deduped by objectID for popular older hits.) | high | med | low |
-| 3 | precision | **IDF-aware BM25F relevance in `base.py` (replace flat term-coverage).** Approximate IDF from doc-frequency across the CURRENT fetched candidate pool (no corpus needed) so rare terms ("teradyne") outweigh common ones ("market"). Length-normalize title-TF vs body/tags-TF, title boost ~3×, one saturation curve (k1~1.4, b~0.4). Keep output in the existing 0..0.9 range so `score.py` weights stay valid. | high | med | **med** |
+| ~~3~~ | precision | **REJECTED 2026-06-11 (measured, iteration 10).** IDF over the per-query pool is unsound: the pool is query-BIASED, so the query's core term has high DF → low IDF → demoted. Live "tesla stock market" → IDF demoted a Tesla item and promoted a non-Tesla "Daily Stock Digest". Would worsen ranking. Only viable with a real background corpus (out of scope, no deps/state). Don't build. | high | med | med |
 | ~~4~~ | precision | **✅ DONE 2026-06-11 (iteration 3)** — token-set (EN) / char-trigram (CJK) Jaccard ≥0.6 near-dup pass in `normalize.dedupe()`, after the exact pass, highest-score copy wins; short-title guard against over-merge. `lastdays.py` refactored to reuse it. Live: merged 7 extra cross-source dups on "OpenAI" 10d. | high | med | low |
 | ~~5~~ | precision | **✅ DONE 2026-06-11 (iteration 4)** — `base.adaptive_topic_gate()` wired into the orchestrator for the 3 ungated full-text sources (hackernews/github/polymarket); ≥2-token queries return on-topic subset when ≥3 remain, else keep all (recall). Audit found the other 5 listed sources already gate at fetch. xiaohongshu (bridge source) left as-is. Live: "open source LLM" HN 27→13. | high | small | med |
 | ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
