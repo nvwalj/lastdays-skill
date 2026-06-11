@@ -14,6 +14,7 @@ keeps the source alive there. Both carry full engagement (neither degraded).
 
 from __future__ import annotations
 
+import re
 from urllib.parse import urlencode
 
 from .. import dates, http, registry
@@ -26,6 +27,12 @@ APPVIEW_HOST = "api.bsky.app"
 PATH = "/xrpc/app.bsky.feed.searchPosts"
 DEPTH = {"quick": 15, "default": 25, "deep": 50}
 NO_MATCH_FLOOR = 0.3
+# Bluesky uses the post text as our title, and link-sharing posts usually end with
+# the shared article's bare URL ("... www.axios.com/2026/06/08"). Those URL tokens
+# pollute the title, dilute relevance scoring, and skew the cross-source near-dup
+# Jaccard. Strip CLEAR urls only (scheme- or www-prefixed) so tech terms with dots
+# (node.js, asyncio.run) survive. The post's own permalink lives in url/metadata.
+_URL_RE = re.compile(r"(?i)\b(?:https?://|www\.)\S+")
 
 
 def _web_url(handle: str, uri: str) -> str:
@@ -57,10 +64,10 @@ def _parse(posts: list, query: str) -> list[Item]:
         record = p.get("record")
         if not isinstance(record, dict):  # malformed entry -> skip (no AttributeError)
             continue
-        # AT-Proto post text is PLAINTEXT, not HTML: just collapse whitespace.
-        # strip_html would delete "<...>" spans (code, "a<b") and could flip the
-        # on-topic gate or corrupt the title.
-        text = " ".join((record.get("text") or "").split())
+        # AT-Proto post text is PLAINTEXT, not HTML: just collapse whitespace
+        # (strip_html would delete "<...>" spans like code/"a<b"). Also strip bare
+        # shared-article URLs so they don't pollute the title/relevance/dedup.
+        text = " ".join(_URL_RE.sub(" ", record.get("text") or "").split())
         if not text:
             continue
         # Gate AND score on the FULL post (<=300 chars); only the title is

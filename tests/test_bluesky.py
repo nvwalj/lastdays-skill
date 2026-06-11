@@ -84,6 +84,22 @@ def test_plaintext_angle_brackets_preserved():
     assert "a<b" in items[0].title and "<3" in items[0].title
 
 
+def test_shared_article_url_stripped_from_title():
+    # Link-share posts end with the bare article URL; it must not pollute the
+    # title/relevance (the post permalink is still in url/metadata).
+    posts = [_post("aaa", "Great piece on web scraping www.axios.com/2026/06/08/scrape")]
+    it = bluesky._parse(posts, "web scraping")[0]
+    assert it.title == "Great piece on web scraping"
+    assert "axios.com" not in it.title and "axios.com" not in it.snippet
+    assert it.url == "https://bsky.app/profile/alice.bsky.social/post/aaa"  # permalink intact
+
+
+def test_tech_terms_with_dots_survive_url_strip():
+    # node.js / asyncio.run are NOT urls (no scheme/www) -> must be kept.
+    it = bluesky._parse([_post("aaa", "scraping with node.js and asyncio.run() today")], "scraping")[0]
+    assert "node.js" in it.title and "asyncio.run()" in it.title
+
+
 def test_empty_text_skipped():
     posts = [{"uri": "at://did:plc:x/app.bsky.feed.post/r1", "record": {"text": ""}, "author": {"handle": "a"}}]
     assert bluesky._parse(posts, "scraping") == []

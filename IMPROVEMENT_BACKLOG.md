@@ -12,6 +12,17 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 8 — DONE: Bluesky title cleanup (backlog #20); phrase-adjacency (#8 slice) skipped as marginal.**
+  Bluesky uses post text as the title, and link-shares end with the bare article URL
+  ("…www.axios.com/2026/06/08") — polluting title, relevance, and the cross-source near-dup
+  Jaccard. Added a conservative `_URL_RE` (scheme/www-prefixed only, so node.js / asyncio.run
+  survive) applied before title/snippet/gate/relevance. 2 new tests; 254 green. **Compounding
+  win measured:** "OpenAI files paperwork for an IPO" went from 2 items (Bluesky + Google News)
+  to 1 — the cleaned Bluesky title now near-dup-merges with the identical Google News headline,
+  which the URL previously blocked. So #20 directly strengthened iteration 3's dedup. **Skipped
+  the phrase-adjacency bonus** (re-scoped #8 slice): it only reorders partial matches (marginal)
+  and touches shared ranking code — not worth the complexity vs #20's demonstrated value.
+
 - **2026-06-11 · iteration 7 — DONE: thread-pool sizing (backlog #16); speed measured & found already-good.**
   Measured first (the right move for a speed pass): cold full run ≈ **1.9s**, warm ≈ 0
   (cache-dominated), wall-clock ≈ the slowest single source (bluesky ~1.6s, reddit ~1.5s,
@@ -132,7 +143,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | 17 | anti-bot | **Per-source "protection class" tag** (`ja4_gated`/`header_heuristic`/`open`) in the tier framework so JA4-gated endpoints (`www.reddit.com search.json`) skip straight to the lenient tier instead of burning the retry budget on an unfixable 403. Pairs with the documented TLS limitation. | med | med | low |
 | 18 | precision | **2nd large Lemmy instance** (lemmy.ml / programming.dev) deduped by post URL + a header-builder lint test (never emit `sec-ch-ua` with a non-Chromium UA; keep platform aligned with UA OS; never attach `Sec-Fetch-User`/`Upgrade-Insecure-Requests` on api). | low | small | low |
 | 19 | new-source | **Popularity-enrichment helpers** (pypistats / npm downloads / Wikipedia pageviews) keyed by a resolved entity, attached to `Item.metadata` for the synthesizer ONLY (NOT into cross-source engagement normalization — units differ). Heavy daily cache. Narrow applicability. | low | med | low |
-| 20 | precision | **Clean Bluesky post titles before scoring/dedup** (found iteration 3). Bluesky uses post text as the "title", which often ends with the shared article's bare URL ("…www.axios.com/2026/06/08"). Strip trailing/inline bare URLs (and collapse to the article's real title where a link card exists) in `sources/bluesky.py` so relevance scoring and the near-dup Jaccard aren't diluted by URL tokens. | med | small | low |
+| ~~20~~ | precision | **✅ DONE 2026-06-11 (iteration 8)** — conservative `_URL_RE` strips scheme/www URLs from Bluesky post text before title/relevance/dedup (tech terms with dots survive). Measured compounding win: a duplicate IPO headline collapsed Bluesky↔Google News. (Link-card title substitution not pursued — URL strip sufficed.) | med | small | low |
 
 ---
 
