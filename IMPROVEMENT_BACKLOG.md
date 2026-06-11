@@ -12,6 +12,23 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 2 — DONE: Google News RSS source (backlog #6); backlog #1 overturned by live probing.**
+  Added `sources/googlenews.py` (`news.google.com/rss/search?q=…+when:{N}d`) as a keyless
+  **degraded** engine source (no engagement → relevance+recency only, `is_on_topic`-gated,
+  pubDate re-checked vs window, " - Publisher" suffix stripped, publisher in `author`).
+  Registered + `ENGINE_SOURCES` + 7 fixture tests; 211 tests green; live run returns 4
+  on-topic in-window articles. Docs updated (SKILL.md, source-policy.md matrix).
+  **Backlog #1 (PullPush + Arctic-Shift) NOT built — live probing overturned the premise:**
+  (a) PullPush is frozen — its newest indexed submission across the whole index is 2025-05-19
+  (~13 months stale), so it returns nothing inside any recent window → excluded. (b) Arctic-Shift
+  is alive & fresh (returned 2026-06-11 data with real score/comments) BUT `posts/search` requires
+  `subreddit` or `author` — no Reddit-wide free-text, and `subreddits/search` is name-PREFIX only
+  (no topical mapping), so there's no good keyless topic→subreddit step. (c) Critically, the
+  existing **`oldweb` tier already does Reddit-wide search WITH real engagement** (live: 14 in-window
+  hits, all with score/comments) even while `json` 403s on the JA3 wall — so the problem #1 set out
+  to fix is already solved. Arctic-Shift remains a *possible future* per-subreddit resilience tier
+  (see revised #1 below), not a priority.
+
 - **2026-06-11 · iteration 1 — DONE: realistic browser identity + gzip in `http.py`.**
   Centralized `browser_headers()` (pinned macOS Chrome 124 UA + `sec-ch-ua`/`Sec-Fetch-*`,
   navigate vs api modes) applied to ALL requests, killing the bot `lastdays/0.1` UA that
@@ -28,12 +45,12 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 
 | # | Cat | Item | val | eff | risk |
 |---|-----|------|-----|-----|------|
-| 1 | reddit | **PullPush + Arctic-Shift as first-class keyless Reddit-SEARCH sources (real score+comments).** New `reddit_pullpush` (`GET api.pullpush.io/reddit/search/submission/?q=&after=&before=&sort=desc&sort_type=created_utc&size=100`) + `reddit_arcticshift` (`arctic-shift.photon-reddit.com/api`, confirm path casing live). Slot ABOVE the RSS degraded tier → honest Reddit-wide search without the JA3 wall. Respect PullPush limits (soft 15/min, hard 30/min, 1000/hr) via per-source min-interval + day cache + 429 backoff. Demote JA3-prone `old.reddit` JSON tier to best-effort. | high | med | low |
+| ~~1~~ | reddit | **REVISED 2026-06-11 (live-probed) — premise dead, DEPRIORITIZED (see Status log).** PullPush frozen (newest item 2025-05-19); Arctic-Shift needs `subreddit`/`author` (no Reddit-wide) + name-prefix-only subreddit search; and the `oldweb` tier already does Reddit-wide real-engagement search. *Low-pri remnant:* Arctic-Shift (`posts/search?subreddit=<sub>&query=<q>&after=<ISO>&sort=desc`) as a per-subreddit resilience tier seeded from `oldweb`-surfaced subreddits, only if old.reddit starts blocking. | low | med | low |
 | 2 | new-source | **HN: switch fully to Algolia `search_by_date` with native epoch date window + server-side `points>` gate.** `hn.algolia.com/api/v1/search_by_date?query=&tags=story&numericFilters=created_at_i>{epoch},points>{n}`. (Largely already in place — verify/strengthen; optionally merge a relevance-sorted `/search` pass deduped by objectID for popular older hits.) | high | med | low |
 | 3 | precision | **IDF-aware BM25F relevance in `base.py` (replace flat term-coverage).** Approximate IDF from doc-frequency across the CURRENT fetched candidate pool (no corpus needed) so rare terms ("teradyne") outweigh common ones ("market"). Length-normalize title-TF vs body/tags-TF, title boost ~3×, one saturation curve (k1~1.4, b~0.4). Keep output in the existing 0..0.9 range so `score.py` weights stay valid. | high | med | **med** |
 | 4 | precision | **Cross-source near-duplicate title clustering in `normalize.py dedupe()`.** After the exact URL/title pass, add SimHash (64-bit, blake2b per token, Hamming≤3) OR token-shingle Jaccard≥0.6 (simpler/more accurate for small N; 3-char shingles for CJK). Process highest-score-first so the strongest copy of a reshared story survives. | high | med | low |
 | 5 | precision | **Adaptive hard precision gate: unify `is_on_topic` across the ~8 sources still using bare `NO_MATCH_FLOOR`** (hackernews, github, polymarket, kalshi, lemmy, bluesky, stackexchange, xiaohongshu). For ≥2-meaningful-token queries, DROP zero-hit items instead of flooring them; keep the floor for single-token queries (recall). Make it result-count-adaptive so thin niche topics still return something. | high | small | **med** |
-| 6 | new-source | **Google News RSS source** (`news.google.com/rss/search?q=<q>+when:{N}d&hl=en-US&gl=US&ceid=US:en`, parse via `xml.etree`). `when:{N}d` ties recency to the window server-side. Degraded/no-engagement tier; `is_on_topic` gate. Fills the mainstream-breaking-news gap HN/Reddit miss. | high | small | low |
+| ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
 | 7 | reddit | **Opt-in official-OAuth Reddit tier** gated behind `REDDIT_CLIENT_ID`/`SECRET` env (top-priority tier ONLY when present). `client_credentials` → `oauth.reddit.com/r/<sub>/search` for full engagement at 100 QPM. Engine stays zero-key by default; dormant unless the user opts in. The only ToS-clean live-complete-engagement path. | high | med | low |
 | 8 | precision | **Phrase/bigram adjacency bonus + inlined Porter stemmer in `base.py`.** Small additive bonus when consecutive query tokens are adjacent in the title (contiguous "web scraping" beats scattered), capped below a true full match. Inline a ~200-line public-domain Porter stemmer (zero deps) on query+title tokens for recall. Leave the CJK bigram path unchanged. | high | med | **med** |
 | 9 | precision | **"No strongly-relevant results" signal + selective URL canonicalization.** (a) If the merged pool's max relevance < 0.5 or all top items are floored/degraded, emit an explicit banner instead of presenting noise as findings. (b) In `canonical_url`, strip only known tracking params (utm_*, fbclid, gclid, ref) + unfold AMP/mobile hosts, instead of dropping ALL query strings. | med | small | low |

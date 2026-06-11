@@ -5,13 +5,13 @@ from lib import sources  # noqa: F401  registers all sources on import
 
 
 def test_lang_groups():
-    assert set(registry.resolve_names(None, "en")) == {"hackernews", "reddit", "github", "polymarket", "kalshi", "lobsters", "devto", "stackexchange", "lemmy", "bluesky"}
+    assert set(registry.resolve_names(None, "en")) == {"hackernews", "reddit", "github", "polymarket", "kalshi", "lobsters", "devto", "stackexchange", "lemmy", "bluesky", "googlenews"}
     zh = registry.resolve_names(None, "zh")
     assert "weibo" in zh and len(zh) == 5
 
 
 def test_both_includes_everything():
-    assert len(registry.resolve_names(None, "both")) == 15  # 10 en + 5 zh
+    assert len(registry.resolve_names(None, "both")) == 16  # 11 en + 5 zh
 
 
 def test_aliases():
