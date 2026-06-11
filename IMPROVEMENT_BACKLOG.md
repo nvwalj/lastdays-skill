@@ -12,6 +12,21 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 3 — DONE: cross-source near-duplicate clustering (backlog #4).**
+  `normalize.dedupe()` now runs a 2nd pass after the exact URL/title pass: token-set
+  Jaccard (EN) / char-trigram Jaccard (CJK) at `NEAR_DUP_JACCARD=0.6`, keeping the
+  highest-scored copy. Conservative by design — short titles (EN <4 content tokens,
+  CJK <6 chars) dedupe on exact only (false-merge of a distinct story is worse than a
+  shown dup). Also refactored `lastdays.py` to reuse `normalize.dedupe()` (it had a
+  duplicated inline exact-only dedup that bypassed the new pass) — single source of
+  truth now. 6 new dedupe tests incl. over-merge guards; 217 tests green. Live delta:
+  "OpenAI" 10d merged **7 extra cross-source dups** (158→151) the exact pass missed
+  ("Model routing…" and "OpenAI mulls slashing…" each were in HN *and* Google News),
+  while correctly KEEPING distinct same-event articles (8 different outlets' IPO-filing
+  coverage stayed separate — event-clustering is the agent's job, not the engine's).
+  **New finding → backlog #20:** Bluesky post "titles" embed the article URL
+  ("…www.axios.com/2026/06/08"), polluting both relevance scoring and dedup Jaccard.
+
 - **2026-06-11 · iteration 2 — DONE: Google News RSS source (backlog #6); backlog #1 overturned by live probing.**
   Added `sources/googlenews.py` (`news.google.com/rss/search?q=…+when:{N}d`) as a keyless
   **degraded** engine source (no engagement → relevance+recency only, `is_on_topic`-gated,
@@ -48,7 +63,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | ~~1~~ | reddit | **REVISED 2026-06-11 (live-probed) — premise dead, DEPRIORITIZED (see Status log).** PullPush frozen (newest item 2025-05-19); Arctic-Shift needs `subreddit`/`author` (no Reddit-wide) + name-prefix-only subreddit search; and the `oldweb` tier already does Reddit-wide real-engagement search. *Low-pri remnant:* Arctic-Shift (`posts/search?subreddit=<sub>&query=<q>&after=<ISO>&sort=desc`) as a per-subreddit resilience tier seeded from `oldweb`-surfaced subreddits, only if old.reddit starts blocking. | low | med | low |
 | 2 | new-source | **HN: switch fully to Algolia `search_by_date` with native epoch date window + server-side `points>` gate.** `hn.algolia.com/api/v1/search_by_date?query=&tags=story&numericFilters=created_at_i>{epoch},points>{n}`. (Largely already in place — verify/strengthen; optionally merge a relevance-sorted `/search` pass deduped by objectID for popular older hits.) | high | med | low |
 | 3 | precision | **IDF-aware BM25F relevance in `base.py` (replace flat term-coverage).** Approximate IDF from doc-frequency across the CURRENT fetched candidate pool (no corpus needed) so rare terms ("teradyne") outweigh common ones ("market"). Length-normalize title-TF vs body/tags-TF, title boost ~3×, one saturation curve (k1~1.4, b~0.4). Keep output in the existing 0..0.9 range so `score.py` weights stay valid. | high | med | **med** |
-| 4 | precision | **Cross-source near-duplicate title clustering in `normalize.py dedupe()`.** After the exact URL/title pass, add SimHash (64-bit, blake2b per token, Hamming≤3) OR token-shingle Jaccard≥0.6 (simpler/more accurate for small N; 3-char shingles for CJK). Process highest-score-first so the strongest copy of a reshared story survives. | high | med | low |
+| ~~4~~ | precision | **✅ DONE 2026-06-11 (iteration 3)** — token-set (EN) / char-trigram (CJK) Jaccard ≥0.6 near-dup pass in `normalize.dedupe()`, after the exact pass, highest-score copy wins; short-title guard against over-merge. `lastdays.py` refactored to reuse it. Live: merged 7 extra cross-source dups on "OpenAI" 10d. | high | med | low |
 | 5 | precision | **Adaptive hard precision gate: unify `is_on_topic` across the ~8 sources still using bare `NO_MATCH_FLOOR`** (hackernews, github, polymarket, kalshi, lemmy, bluesky, stackexchange, xiaohongshu). For ≥2-meaningful-token queries, DROP zero-hit items instead of flooring them; keep the floor for single-token queries (recall). Make it result-count-adaptive so thin niche topics still return something. | high | small | **med** |
 | ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
 | 7 | reddit | **Opt-in official-OAuth Reddit tier** gated behind `REDDIT_CLIENT_ID`/`SECRET` env (top-priority tier ONLY when present). `client_credentials` → `oauth.reddit.com/r/<sub>/search` for full engagement at 100 QPM. Engine stays zero-key by default; dormant unless the user opts in. The only ToS-clean live-complete-engagement path. | high | med | low |
@@ -64,6 +79,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | 17 | anti-bot | **Per-source "protection class" tag** (`ja4_gated`/`header_heuristic`/`open`) in the tier framework so JA4-gated endpoints (`www.reddit.com search.json`) skip straight to the lenient tier instead of burning the retry budget on an unfixable 403. Pairs with the documented TLS limitation. | med | med | low |
 | 18 | precision | **2nd large Lemmy instance** (lemmy.ml / programming.dev) deduped by post URL + a header-builder lint test (never emit `sec-ch-ua` with a non-Chromium UA; keep platform aligned with UA OS; never attach `Sec-Fetch-User`/`Upgrade-Insecure-Requests` on api). | low | small | low |
 | 19 | new-source | **Popularity-enrichment helpers** (pypistats / npm downloads / Wikipedia pageviews) keyed by a resolved entity, attached to `Item.metadata` for the synthesizer ONLY (NOT into cross-source engagement normalization — units differ). Heavy daily cache. Narrow applicability. | low | med | low |
+| 20 | precision | **Clean Bluesky post titles before scoring/dedup** (found iteration 3). Bluesky uses post text as the "title", which often ends with the shared article's bare URL ("…www.axios.com/2026/06/08"). Strip trailing/inline bare URLs (and collapse to the article's real title where a link card exists) in `sources/bluesky.py` so relevance scoring and the near-dup Jaccard aren't diluted by URL tokens. | med | small | low |
 
 ---
 

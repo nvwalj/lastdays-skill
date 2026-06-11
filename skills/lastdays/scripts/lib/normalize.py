@@ -44,21 +44,84 @@ def dedupe_keys(item: Item) -> tuple:
     return (cu or None, nt or None)
 
 
+# --- near-duplicate detection (beyond EXACT url/title) ------------------------
+# The exact pass above only collapses identical normalized titles. The same story
+# reworded or reordered across platforms ("OpenAI files paperwork for an IPO" vs
+# "OpenAI confidentially files IPO paperwork"), or a news article that appears as
+# both a Google News item and an HN/Reddit link to the publisher (whose URL never
+# matches Google's redirect URL), still survives N times. A token-set / CJK-char-
+# trigram Jaccard catches those. The threshold is deliberately conservative:
+# losing a distinct story (false merge) is worse than showing a near-dup (false
+# split), so short titles dedupe on EXACT match only and only clear overlaps merge.
+NEAR_DUP_JACCARD = 0.6
+_MIN_EN_TOKENS = 4          # shorter EN titles -> exact-only (Jaccard unstable)
+_MIN_CJK_CHARS = 6          # shorter CJK titles -> exact-only
+_CJK_RE = re.compile(r"[一-鿿]")  # matches norm_title's kept CJK range
+# Grammatical stopwords only; dropping them keeps two unrelated headlines from
+# merging just because they share "the/of/for". (Local copy to keep normalize
+# free of source-layer imports.)
+_DUP_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "for", "and", "or", "to", "in", "on", "at", "is",
+    "are", "vs", "how", "what", "why", "with", "by", "from", "as", "it", "its",
+    "this", "that", "new", "via", "you", "your", "be", "will", "has", "have",
+})
+
+
+def _dup_signature(title: str) -> frozenset | None:
+    """A comparison set for near-dup detection, or None when the title is too
+    short to compare safely (those dedupe on exact match only). EN -> content
+    word-token set (order-insensitive, so reordered headlines match); CJK ->
+    character-trigram set (space-less scripts have no word tokens)."""
+    nt = norm_title(title)
+    if not nt:
+        return None
+    if _CJK_RE.search(nt):
+        cjk = "".join(c for c in nt if _CJK_RE.match(c))
+        if len(cjk) < _MIN_CJK_CHARS:
+            return None
+        return frozenset(cjk[i:i + 3] for i in range(len(cjk) - 2))
+    toks = [t for t in nt.split() if t not in _DUP_STOPWORDS]
+    if len(toks) < _MIN_EN_TOKENS:
+        return None
+    return frozenset(toks)
+
+
+def _jaccard(a: frozenset, b: frozenset) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _is_near_dup(sig: frozenset, kept_sigs: list) -> bool:
+    """True if sig overlaps an already-kept signature at/above the threshold.
+    (EN token sets and CJK trigram sets never overlap, so mixing is harmless.)"""
+    return any(_jaccard(sig, k) >= NEAR_DUP_JACCARD for k in kept_sigs)
+
+
 def dedupe(items: list[Item]) -> list[Item]:
-    """Drop duplicates by canonical URL OR normalized title, keeping the
-    higher-scored / higher-engagement copy. Process highest-score-first so the
-    survivor is the strongest copy (e.g. HN original over a low-score reshare)."""
+    """Drop duplicates, keeping the higher-scored / higher-engagement copy.
+    Process highest-score-first so the survivor is the strongest copy (e.g. an HN
+    original over a low-score reshare). Two passes: (1) EXACT canonical URL or
+    normalized title; (2) NEAR-duplicate titles via Jaccard (catches reworded /
+    reordered headlines and the same article surfacing on Google News and as an
+    HN/Reddit link, whose URLs differ)."""
     seen_url: set = set()
     seen_title: set = set()
+    kept_sigs: list = []
     out: list[Item] = []
     for it in sorted(items, key=lambda i: (i.score, i.engagement_total()), reverse=True):
         cu, nt = dedupe_keys(it)
         if (cu and cu in seen_url) or (nt and nt in seen_title):
-            continue  # a stronger copy already kept
+            continue  # exact: a stronger copy already kept
+        sig = _dup_signature(it.title)
+        if sig is not None and _is_near_dup(sig, kept_sigs):
+            continue  # near-dup: a stronger copy of the same story already kept
         if cu:
             seen_url.add(cu)
         if nt:
             seen_title.add(nt)
+        if sig is not None:
+            kept_sigs.append(sig)
         out.append(it)
     return out
 

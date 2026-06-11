@@ -147,27 +147,14 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
         score.score_items(items, window)
         report.items_by_source[name] = score.rank(items)
 
-    # Cross-source dedupe by canonical URL OR normalized title, preserving the
-    # per-source grouping. A higher-scored copy wins (e.g. the HN original beats
-    # a low-score Reddit reshare of the same story), so the survivor is dropped
-    # from the weaker source's list. Highest-score-first ensures that ordering.
-    seen_url: set[str] = set()
-    seen_title: set[str] = set()
-    ranked = sorted(
-        (it for name in engine_targets for it in report.items_by_source.get(name, [])),
-        key=lambda i: (i.score, i.engagement_total()),
-        reverse=True,
-    )
-    survivors: set[int] = set()
-    for it in ranked:
-        cu, nt = normalize.dedupe_keys(it)
-        if (cu and cu in seen_url) or (nt and nt in seen_title):
-            continue
-        if cu:
-            seen_url.add(cu)
-        if nt:
-            seen_title.add(nt)
-        survivors.add(id(it))
+    # Cross-source dedupe (exact canonical-URL/title + near-duplicate titles),
+    # preserving the per-source grouping. normalize.dedupe is the single source of
+    # truth: it keeps the higher-scored copy (the HN original beats a low-score
+    # Reddit reshare or a Google News echo of the same story), so the survivor is
+    # dropped from the weaker source's list. We reuse it for survivor selection,
+    # then filter each source list to survivors so the grouping/order is intact.
+    all_items = [it for name in engine_targets for it in report.items_by_source.get(name, [])]
+    survivors = {id(it) for it in normalize.dedupe(all_items)}
     for name in engine_targets:
         report.items_by_source[name] = [
             it for it in report.items_by_source.get(name, []) if id(it) in survivors
