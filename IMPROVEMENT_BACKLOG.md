@@ -12,6 +12,20 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 9 — DONE: synthesis-rules coherence; #15 (Mastodon) + #7 (Reddit OAuth) both rejected on validation.**
+  Probe-first, and both pre-planned additions failed the bar: **Mastodon** keyless hashtag
+  timelines are low-quality (live: #webscraping 3/20 with any engagement; #python/#webscraping
+  full of promo spam; engagement too weak — fav 0–3 — to filter it) → adding it would inject
+  noise into an engagement-grounded tool. **Reddit OAuth (#7)** token endpoint is on
+  `www.reddit.com` (the same host behind the JA3 wall that 403s us) and is untestable without
+  credentials → would be shipping unverified, possibly-broken code. Skipped both. Instead closed
+  a real **agent-contract gap**: `synthesis-rules.md` said "quote real numbers from engine items"
+  (implying all engine items have engagement) but the new degraded sources (Google News, arXiv)
+  have none, and the iter-5 weak-signal flags weren't documented for the synthesizer. Updated the
+  engagement-honesty rule (degraded items → cite by outlet/author, never fabricate counts) and
+  added a "honor the weak-signal flags" rule. Docs-only; 254 tests still green. This makes the
+  engine's honest signals actually reach the brief.
+
 - **2026-06-11 · iteration 8 — DONE: Bluesky title cleanup (backlog #20); phrase-adjacency (#8 slice) skipped as marginal.**
   Bluesky uses post text as the title, and link-shares end with the bare article URL
   ("…www.axios.com/2026/06/08") — polluting title, relevance, and the cross-source near-dup
@@ -130,7 +144,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | ~~4~~ | precision | **✅ DONE 2026-06-11 (iteration 3)** — token-set (EN) / char-trigram (CJK) Jaccard ≥0.6 near-dup pass in `normalize.dedupe()`, after the exact pass, highest-score copy wins; short-title guard against over-merge. `lastdays.py` refactored to reuse it. Live: merged 7 extra cross-source dups on "OpenAI" 10d. | high | med | low |
 | ~~5~~ | precision | **✅ DONE 2026-06-11 (iteration 4)** — `base.adaptive_topic_gate()` wired into the orchestrator for the 3 ungated full-text sources (hackernews/github/polymarket); ≥2-token queries return on-topic subset when ≥3 remain, else keep all (recall). Audit found the other 5 listed sources already gate at fetch. xiaohongshu (bridge source) left as-is. Live: "open source LLM" HN 27→13. | high | small | med |
 | ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
-| 7 | reddit | **Opt-in official-OAuth Reddit tier** gated behind `REDDIT_CLIENT_ID`/`SECRET` env (top-priority tier ONLY when present). `client_credentials` → `oauth.reddit.com/r/<sub>/search` for full engagement at 100 QPM. Engine stays zero-key by default; dormant unless the user opts in. The only ToS-clean live-complete-engagement path. | high | med | low |
+| 7 | reddit | **BLOCKED/untestable 2026-06-11.** Opt-in official-OAuth Reddit tier (`REDDIT_CLIENT_ID`/`SECRET` → `oauth.reddit.com`). Problem: the token endpoint is on `www.reddit.com`, the same host behind the JA3 wall that 403s our urllib client — so OAuth may not even authenticate from this engine, and it's untestable without credentials. Only revisit if (a) a contributor with a Reddit app confirms the token POST succeeds from stdlib urllib, or (b) the oldweb tier starts failing and a durable path is genuinely needed. | high | med | low |
 | 8 | precision | **RE-SCOPED 2026-06-11 — do the SAFE slice only.** Original (Porter stemmer + acronym map) deferred: observed gaps (MCP↔"model context protocol", "rust async runtime") are acronym/semantic, NOT stemming-fixable, and an acronym map is arbitrary/unscalable without embeddings (no deps). SAFE slice worth doing: a **phrase/bigram adjacency bonus** in `title_relevance` only (contiguous query tokens beat scattered), capped below a full match — ranking-only, does NOT touch the `is_on_topic` gate, so no noise-regression risk. Optionally a *very* light plural/tense normalizer (-s/-es/-ed) with length guards, but only after measuring it doesn't loosen the gate. | med | small | low |
 | ~~9~~ | precision | **✅ DONE 2026-06-11 (iteration 5)** — (a) per-source `⚠ no strongly-relevant results` flag + global NOTE when max relevance < 0.4 (`render.py`). (b) `canonical_url` strips only tracking params + unfolds m./amp. hosts + `/amp`, keeps content params (fixes `?v=`/`?id=` over-collapse). 10 new tests. | med | small | low |
 | 10 | reddit | **Formalize Reddit `.rss` as the honest degraded FLOOR tier** (`www.reddit.com/r/<sub>/search.rss?...` + site-wide, via `get_text`; Atom parse; `degraded=true`, no engagement). Guarantees the engine never returns zero Reddit results when PullPush/Arctic-Shift/JSON are down. (Partly exists; make it the explicit last tier.) | med | small | low |
@@ -138,7 +152,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | ~~12~~ | new-source | **✅ DONE 2026-06-11 (iteration 6)** — `sources/arxiv.py`, degraded Atom source, phrase `all:"<q>"` search, title-OR-abstract gate, window-rechecked. Live: 29 papers for "large language model agents". | med | small | low |
 | 13 | new-source | **Bing News RSS** (`www.bing.com/news/search?q=<q>&format=rss`) as a 2nd mainstream corroborator; dedupe against Google News by normalized URL/title. Degraded. | med | small | low |
 | 14 | speed | **Keep-alive connection reuse within paginated same-host sources** (Algolia/HN pages, multi-page GitHub) via a module-local, per-thread `http.client.HTTPSConnection` (NOT a global pool — that reinvents urllib3). Drops repeated TCP+TLS handshakes. | med | med | **med** |
-| 15 | new-source | **Mastodon hashtag-timeline source** (`mastodon.social/api/v1/timelines/tag/<tag>?limit=40`). Real `favourites/reblogs/replies` counts. CAVEAT: free-text `/api/v2/search` returns empty statuses without a token — only the hashtag-timeline path is keyless. Register lower-confidence so fresh 0-engagement posts don't distort normalization. | med | med | **med** |
+| ~~15~~ | new-source | **REJECTED 2026-06-11 (live-probed, iteration 9).** Mastodon keyless hashtag timelines are low-quality: #webscraping 3/20 had any engagement; #python/#webscraping dominated by promo spam; engagement too weak (fav 0–3) to filter it. Would inject noise into an engagement-grounded tool — fails the "最准确" bar. Don't add. | med | med | med |
 | ~~16~~ | speed | **✅ DONE 2026-06-11 (iteration 7)** — `_pool_size()` cap 24; all 12 EN sources run concurrently (was queuing 4 behind 8). Measured cold ≈1.9s, warm ≈0. | med | small | low |
 | 17 | anti-bot | **Per-source "protection class" tag** (`ja4_gated`/`header_heuristic`/`open`) in the tier framework so JA4-gated endpoints (`www.reddit.com search.json`) skip straight to the lenient tier instead of burning the retry budget on an unfixable 403. Pairs with the documented TLS limitation. | med | med | low |
 | 18 | precision | **2nd large Lemmy instance** (lemmy.ml / programming.dev) deduped by post URL + a header-builder lint test (never emit `sec-ch-ua` with a non-Chromium UA; keep platform aligned with UA OS; never attach `Sec-Fetch-User`/`Upgrade-Insecure-Requests` on api). | low | small | low |
