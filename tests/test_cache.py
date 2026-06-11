@@ -50,6 +50,7 @@ def test_http_get_uses_cache(monkeypatch, tmp_path):
 
     class FakeResp:
         status = 200
+        headers = {}  # real urllib responses always expose .headers (for Content-Encoding)
         def read(self): return b'{"hello": "world"}'
         def __enter__(self): return self
         def __exit__(self, *a): return False
@@ -71,6 +72,7 @@ def test_http_get_text_uses_cache(monkeypatch, tmp_path):
 
     class FakeResp:
         status = 200
+        headers = {}  # real urllib responses always expose .headers (for Content-Encoding)
         def read(self): return b"<rss>feed body</rss>"
         def __enter__(self): return self
         def __exit__(self, *a): return False
@@ -120,6 +122,7 @@ def test_http_post_not_cached(monkeypatch, tmp_path):
 
     class FakeResp:
         status = 200
+        headers = {}  # real urllib responses always expose .headers (for Content-Encoding)
         def read(self): return b'{"ok": 1}'
         def __enter__(self): return self
         def __exit__(self, *a): return False
@@ -138,6 +141,7 @@ def test_paged_requests_are_cached(monkeypatch, tmp_path):
 
     class FakeResp:
         status = 200
+        headers = {}  # real urllib responses always expose .headers (for Content-Encoding)
         def __init__(self, body): self._b = body
         def read(self): return self._b
         def __enter__(self): return self

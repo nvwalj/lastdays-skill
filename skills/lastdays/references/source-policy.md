@@ -54,6 +54,22 @@ A source can declare ordered `tiers` instead of a single `fetch` (`lib/registry.
 
 Rank by what real people engaged with: high upvotes/points/comments, fast growth, repeated narratives across sources, representative quotes. Engine items carry real numbers; agent-added web/X/Chinese items do not — rank those below comparable engine items and label them web-sourced.
 
+## HTTP layer: browser identity & the stdlib TLS ceiling
+
+Every fetch goes through `scripts/lib/http.py`, which presents **one pinned, self-consistent macOS Chrome 124 identity** on the wire — not a bot UA:
+
+- **Headers** (`browser_headers()`): real Chrome `User-Agent` + matching `sec-ch-ua` / `sec-ch-ua-mobile` / `sec-ch-ua-platform`, `Accept-Language`, and `Accept-Encoding: gzip, deflate`. JSON/XHR calls (`request`) use `Sec-Fetch-Mode: cors` / `Dest: empty`; HTML/RSS navigations (`get_text`) use the `navigate`/`document` set plus `Upgrade-Insecure-Requests`. The two modes are kept distinct on purpose — emitting `Sec-Fetch-User`/`Upgrade-Insecure-Requests` on an XHR is itself a cross-layer tell. Callers layer their own headers on top, so a source can still override `Accept` or add `Authorization`/`Referer`/`Cookie`.
+- **No UA rotation.** Rotating a browser UA over the single fixed OpenSSL ClientHello (whose JA4 matches no real browser) maps many identities onto one impossible TLS fingerprint — a *stronger* bot signal than a stable UA. The UA version, `sec-ch-ua` brand version, and platform token must always move together.
+- **Compression** (`_decode_body`): `gzip`/`deflate` are advertised and inflated via stdlib `zlib`/`gzip`. `br`/`zstd` are deliberately **not** advertised (no stdlib decoder on 3.12) — claiming an encoding you can't decode is worse than omitting it.
+
+**The ceiling this layer does NOT try to beat (stdlib-only, honest limits):**
+
+- **TLS fingerprinting (JA3, and JA4 — now primary at Cloudflare/Akamai/AWS WAF/DataDome).** It is computed from the ClientHello *before any HTTP header is sent*. Python's `urllib` uses the system OpenSSL ClientHello, whose JA4 matches no browser, so a request can be flagged a bot before the request line is read. **No header craft fixes a wrong ClientHello.** This is the root cause of `www.reddit.com` `search.json` 403s and is unfixable without a third-party TLS stack (`curl_cffi`, `tls-client`, `rnet`) — out of scope for the zero-dependency engine.
+- **HTTP/2** is not in stdlib (`urllib` is HTTP/1.1 only). Real Chrome always negotiates h2 via ALPN, so never speaking h2 is itself a mismatch (Akamai's h2 fingerprint inspects SETTINGS + pseudo-header order). Concurrency stays thread-based HTTP/1.1.
+- **Post-quantum TLS** (X25519MLKEM768) is a live pre-HTTP signal in Chrome 131+. The UA is pinned to **124**, which predates default PQ, so the stdlib ClientHello at least doesn't claim a version that always sends it.
+
+What header realism *does* buy: it moves requests from "obvious bot" toward "plausible" on the **bulk of keyless sources**, which gate on UA/header heuristics rather than full JA4 + JS challenges — and the `gzip` path also cuts transfer latency on every fetch. It does not, and is not meant to, defeat a strict JA4/h2 edge. When a source is JA4-gated, the tier framework should fall straight to its lenient tier (RSS/HTML/third-party mirror) rather than burn retries on a 403 header craft can't fix.
+
 ## Adding a Chinese source (turning a stub into a real fetcher)
 
 The registry is the only extension point. To implement e.g. Weibo:
