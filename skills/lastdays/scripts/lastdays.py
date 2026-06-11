@@ -52,6 +52,19 @@ _LAYER_LABELS = {
 # Sized above a normal single-source fetch+retry (~20s) but well below "forever".
 ENGINE_DEADLINE = 45
 
+# Source fetches are I/O-bound (each thread mostly waits on the network), so the
+# pool should run EVERY source concurrently rather than queue some — wall-clock is
+# then the slowest single source, not sum-of-waves. The old min(8, N) cap silently
+# queued 4 of the 12 EN sources behind the first 8 once Google News + arXiv landed.
+# Cap at 24 (well inside the diminishing-returns zone for idle network threads) so
+# growth stays covered without spawning unbounded threads.
+_MAX_WORKERS_CAP = 24
+
+
+def _pool_size(n_sources: int) -> int:
+    return max(1, min(_MAX_WORKERS_CAP, n_sources))
+
+
 # Sources that search server-side over body text (not tags/handles), so they can
 # return items whose title is off-topic. The engine applies an adaptive is_on_topic
 # gate to their output (see base.adaptive_topic_gate). Everything else either gates
@@ -130,7 +143,7 @@ def run(topic, days, lang, sources_arg, depth, allow_undated, config):
         # exit, which would re-introduce the hang we're guarding against (a wedged
         # source's thread is still running). Manage it explicitly and shut down
         # without waiting so a stalled source can't hold the run hostage.
-        ex = concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(engine_targets)))
+        ex = concurrent.futures.ThreadPoolExecutor(max_workers=_pool_size(len(engine_targets)))
         futs = {ex.submit(_fetch, n): n for n in engine_targets}
         pending = set(futs)
         try:

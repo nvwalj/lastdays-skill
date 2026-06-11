@@ -12,6 +12,18 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 7 — DONE: thread-pool sizing (backlog #16); speed measured & found already-good.**
+  Measured first (the right move for a speed pass): cold full run ≈ **1.9s**, warm ≈ 0
+  (cache-dominated), wall-clock ≈ the slowest single source (bluesky ~1.6s, reddit ~1.5s,
+  both network-bound). The one real issue: `max_workers=min(8, N)` silently QUEUED 4 of the
+  12 EN sources behind the first 8 once Google News + arXiv landed. Fixed → `_pool_size()`
+  with cap 24 so every source runs concurrently; wall-clock is now the slowest source, not
+  sum-of-waves. Gain is modest on a fast run (within network noise) but real under load /
+  growth. 3-assert test; 241 green. **Honest finding: speed has little headroom left** — the
+  cache is the dominant lever and it's already strong, so #11 (conditional GET/ETag) and #14
+  (keep-alive) are deprioritized (marginal cold-cross-day savings, added complexity). Future
+  iterations return to accuracy/coverage where the value is.
+
 - **2026-06-11 · iteration 6 — DONE: arXiv research source (backlog #12); #8 deferred with reasoning.**
   Added `sources/arxiv.py` (`export.arxiv.org/api/query`, Atom) as a keyless **degraded**
   engine source — primary CS/ML/physics research, the layer news/social/forum miss. Phrase
@@ -111,12 +123,12 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | 8 | precision | **RE-SCOPED 2026-06-11 — do the SAFE slice only.** Original (Porter stemmer + acronym map) deferred: observed gaps (MCP↔"model context protocol", "rust async runtime") are acronym/semantic, NOT stemming-fixable, and an acronym map is arbitrary/unscalable without embeddings (no deps). SAFE slice worth doing: a **phrase/bigram adjacency bonus** in `title_relevance` only (contiguous query tokens beat scattered), capped below a full match — ranking-only, does NOT touch the `is_on_topic` gate, so no noise-regression risk. Optionally a *very* light plural/tense normalizer (-s/-es/-ed) with length guards, but only after measuring it doesn't loosen the gate. | med | small | low |
 | ~~9~~ | precision | **✅ DONE 2026-06-11 (iteration 5)** — (a) per-source `⚠ no strongly-relevant results` flag + global NOTE when max relevance < 0.4 (`render.py`). (b) `canonical_url` strips only tracking params + unfolds m./amp. hosts + `/amp`, keeps content params (fixes `?v=`/`?id=` over-collapse). 10 new tests. | med | small | low |
 | 10 | reddit | **Formalize Reddit `.rss` as the honest degraded FLOOR tier** (`www.reddit.com/r/<sub>/search.rss?...` + site-wide, via `get_text`; Atom parse; `degraded=true`, no engagement). Guarantees the engine never returns zero Reddit results when PullPush/Arctic-Shift/JSON are down. (Partly exists; make it the explicit last tier.) | med | small | low |
-| 11 | speed | **Conditional GET (ETag / If-Modified-Since + 304) layered on the day cache.** Persist last ETag + Last-Modified per URL in `cache.py`; on a cache MISS send `If-None-Match`/`If-Modified-Since`; catch `HTTPError` code 304 and serve the cached body. Saves payload transfer cross-day + for non-day-cached sources. Scope to sources that actually return validators. | med | med | low |
+| 11 | speed | **DEPRIORITIZED 2026-06-11** (measured: speed headroom is small, cache already dominates). Conditional GET (ETag / If-Modified-Since + 304) on the day cache — saves payload transfer cross-day for sources that emit validators. Revisit only if cold-run latency becomes a problem. | low | med | low |
 | ~~12~~ | new-source | **✅ DONE 2026-06-11 (iteration 6)** — `sources/arxiv.py`, degraded Atom source, phrase `all:"<q>"` search, title-OR-abstract gate, window-rechecked. Live: 29 papers for "large language model agents". | med | small | low |
 | 13 | new-source | **Bing News RSS** (`www.bing.com/news/search?q=<q>&format=rss`) as a 2nd mainstream corroborator; dedupe against Google News by normalized URL/title. Degraded. | med | small | low |
 | 14 | speed | **Keep-alive connection reuse within paginated same-host sources** (Algolia/HN pages, multi-page GitHub) via a module-local, per-thread `http.client.HTTPSConnection` (NOT a global pool — that reinvents urllib3). Drops repeated TCP+TLS handshakes. | med | med | **med** |
 | 15 | new-source | **Mastodon hashtag-timeline source** (`mastodon.social/api/v1/timelines/tag/<tag>?limit=40`). Real `favourites/reblogs/replies` counts. CAVEAT: free-text `/api/v2/search` returns empty statuses without a token — only the hashtag-timeline path is keyless. Register lower-confidence so fresh 0-engagement posts don't distort normalization. | med | med | **med** |
-| 16 | speed | **Tune `ThreadPoolExecutor` max_workers** to total expected in-flight requests (cap ~24–32) so all ~12 sources + sub-requests run concurrently, not queued. Verify the slowest source defines latency, not pool starvation. | med | small | low |
+| ~~16~~ | speed | **✅ DONE 2026-06-11 (iteration 7)** — `_pool_size()` cap 24; all 12 EN sources run concurrently (was queuing 4 behind 8). Measured cold ≈1.9s, warm ≈0. | med | small | low |
 | 17 | anti-bot | **Per-source "protection class" tag** (`ja4_gated`/`header_heuristic`/`open`) in the tier framework so JA4-gated endpoints (`www.reddit.com search.json`) skip straight to the lenient tier instead of burning the retry budget on an unfixable 403. Pairs with the documented TLS limitation. | med | med | low |
 | 18 | precision | **2nd large Lemmy instance** (lemmy.ml / programming.dev) deduped by post URL + a header-builder lint test (never emit `sec-ch-ua` with a non-Chromium UA; keep platform aligned with UA OS; never attach `Sec-Fetch-User`/`Upgrade-Insecure-Requests` on api). | low | small | low |
 | 19 | new-source | **Popularity-enrichment helpers** (pypistats / npm downloads / Wikipedia pageviews) keyed by a resolved entity, attached to `Item.metadata` for the synthesizer ONLY (NOT into cross-source engagement normalization — units differ). Heavy daily cache. Narrow applicability. | low | med | low |

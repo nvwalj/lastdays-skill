@@ -44,3 +44,13 @@ def test_all_fast_sources_complete(monkeypatch):
     report = engine.run("topic", 7, "en", "reddit,hackernews", "default", False, {})
     assert report.items_by_source["reddit"] and report.items_by_source["hackernews"]
     assert not report.errors_by_source
+
+
+def test_pool_size_runs_every_engine_source_concurrently():
+    # I/O-bound fan-out: no source should queue behind another (the old min(8,N)
+    # cap silently queued 4 of the 12 EN sources once Google News + arXiv landed).
+    from lib import registry
+    en = registry.resolve_names(None, "en")
+    assert engine._pool_size(len(en)) == len(en)          # all run at once
+    assert engine._pool_size(1000) == engine._MAX_WORKERS_CAP  # capped for growth
+    assert engine._pool_size(0) == 1                       # never zero workers
