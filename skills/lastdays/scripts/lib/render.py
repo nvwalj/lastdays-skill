@@ -7,6 +7,18 @@ from collections import Counter
 
 from .schema import Report
 
+# A source whose best item still scores below this has no real token match — every
+# item is at the no-match floor (~0.3), i.e. front-page/optionalWords noise the
+# adaptive gate kept only because nothing on-topic existed. We say so explicitly
+# rather than letting the agent read floored noise as findings. A genuine partial
+# match (e.g. 2 of 4 query tokens -> 0.4) sits at/above this and is NOT flagged.
+WEAK_RELEVANCE_CEILING = 0.4
+
+
+def _source_is_weak(items: list) -> bool:
+    """True when no item carries a real (above-floor) relevance match."""
+    return bool(items) and max((it.relevance for it in items), default=0.0) < WEAK_RELEVANCE_CEILING
+
 
 def render_json(report: Report) -> str:
     return json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
@@ -26,7 +38,11 @@ def render_compact(report: Report) -> str:
     for src, items in report.items_by_source.items():
         if not items:
             continue
-        out.append(f"## {src} ({len(items)})")
+        weak = _source_is_weak(items)
+        header = f"## {src} ({len(items)})"
+        if weak:
+            header += "  ⚠ no strongly-relevant results in-window — weak/floor matches only; corroborate or omit"
+        out.append(header)
         for it in items:
             eng = " ".join(f"{k}={v}" for k, v in (it.engagement or {}).items() if v)
             head = f"- [{it.item_id or src}] score={it.score:.0f} rel={it.relevance:.2f} | {it.date or 'undated'}"
@@ -47,6 +63,14 @@ def render_compact(report: Report) -> str:
         out.append("")
     out.append("<!-- END EVIDENCE FOR SYNTHESIS -->")
     out.append("")
+    all_items = [it for items in report.items_by_source.values() for it in items]
+    if all_items and not any(it.relevance >= WEAK_RELEVANCE_CEILING for it in all_items):
+        out.append(
+            f'NOTE: no strongly-relevant engine results for "{report.topic}" in the last '
+            f"{report.days} days — every item is a weak/floor match. Lean on the web layers "
+            "below and lower confidence; do not present these as established findings."
+        )
+        out.append("")
     if report.web_layers_requested:
         out.append("## WEB LAYERS TO FILL (use WebSearch/WebFetch, then synthesize)")
         out.append(

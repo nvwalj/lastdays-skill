@@ -3,14 +3,31 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .dates import Window
 from .schema import Item
 
+# Tracking/analytics params carry no content identity — two share links of the
+# same article differ only here, so they must be stripped for dedup to collapse
+# them. (All utm_* are dropped by prefix too.) Everything else is KEPT, because a
+# query param is often the content id: youtube ?v=, ?id=, ?p=, paginated ?page=.
+# Dropping ALL query (the old behavior) wrongly merged distinct ?v=A and ?v=B.
+_TRACKING_PARAMS = frozenset({
+    "fbclid", "gclid", "gclsrc", "dclid", "msclkid", "yclid", "twclid",
+    "mc_cid", "mc_eid", "igshid", "si", "ref", "ref_src", "ref_url", "referrer",
+    "source", "cmpid", "spm", "scm", "oc", "feature", "_hsenc", "_hsmi",
+})
+# Host prefixes that point at the same content as the bare host (mobile / AMP /
+# www mirrors) — unfold so m.site/x and site/x, amp.site and site dedupe.
+_HOST_PREFIXES = ("www.", "m.", "mobile.", "amp.")
+_AMP_PATH_RE = re.compile(r"/amp(?:\.html?)?$")
+
 
 def canonical_url(u: str) -> str:
-    """Normalize a URL for dedup keying: https, no www, no query/fragment, no trailing slash."""
+    """Normalize a URL for dedup keying: https, unfold www/m/amp host, drop the
+    fragment + trailing slash + AMP suffix, strip tracking params (keep the rest,
+    order-normalized, case preserved so ?v=A and ?v=B stay distinct)."""
     if not u:
         return ""
     try:
@@ -18,10 +35,20 @@ def canonical_url(u: str) -> str:
     except ValueError:
         return u.strip().lower()
     netloc = parts.netloc.lower()
-    if netloc.startswith("www."):
-        netloc = netloc[4:]
+    for pre in _HOST_PREFIXES:
+        if netloc.startswith(pre):
+            netloc = netloc[len(pre):]
+            break  # strip at most one leading mirror prefix
     path = re.sub(r"/+$", "", parts.path)
-    return urlunsplit(("https", netloc, path, "", "")).lower()
+    path = _AMP_PATH_RE.sub("", path)
+    kept = [
+        (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=False)
+        if k.lower() not in _TRACKING_PARAMS and not k.lower().startswith("utm_")
+    ]
+    # Lowercase only scheme/host/path (the original behavior); keep query values
+    # case-exact (?v=dQw4 != ?v=DQW4 are different resources).
+    base = urlunsplit(("https", netloc, path, "", "")).lower()
+    return f"{base}?{urlencode(sorted(kept))}" if kept else base
 
 
 _TITLE_NORM_RE = re.compile(r"[^a-z0-9一-鿿]+")

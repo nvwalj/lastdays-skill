@@ -12,6 +12,18 @@ precision) + synthesis, run 2026-06-11. Re-run the workflow each iteration to re
 
 ## Status log
 
+- **2026-06-11 · iteration 5 — DONE: no-strong-results signal + selective URL canonicalization (backlog #9).**
+  (a) `render.py`: a source whose best item is below the no-match floor ceiling
+  (max relevance < 0.4) gets a per-source `⚠ no strongly-relevant results` flag, and
+  when the WHOLE pool is weak a global `NOTE` tells the agent to lean on web layers +
+  lower confidence. Completes the precision arc — iter 1 found the noise flood, iter 4
+  gates it when on-topic items exist, iter 5 honestly signals it when none do. (b)
+  `normalize.canonical_url()`: was dropping ALL query strings, which wrongly merged
+  distinct `?v=A`/`?v=B`/`?id=` resources. Now strips only tracking params (utm_*,
+  fbclid, gclid, ref, oc, …) and keeps content params (order-normalized, value case
+  preserved); unfolds m./mobile./amp. hosts + trailing `/amp`. 10 new tests; 232 green.
+  Live: "web scraping anti-bot bypass" HN now shows the weak flag + global NOTE.
+
 - **2026-06-11 · iteration 4 — DONE: adaptive precision gate for multi-word queries (backlog #5).**
   Audit first overturned the scope: 5 of the 8 listed sources (stackexchange, devto,
   lemmy, bluesky, kalshi) ALREADY hard-gate with `is_on_topic` at fetch — their
@@ -84,7 +96,7 @@ Ranked by value × safety / effort. All stdlib-safe unless noted.
 | ~~6~~ | new-source | **✅ DONE 2026-06-11 (iteration 2)** — `sources/googlenews.py`, degraded RSS tier, `when:{N}d` + window re-check + `is_on_topic` gate. Mainstream-news layer HN/Reddit miss. | high | small | low |
 | 7 | reddit | **Opt-in official-OAuth Reddit tier** gated behind `REDDIT_CLIENT_ID`/`SECRET` env (top-priority tier ONLY when present). `client_credentials` → `oauth.reddit.com/r/<sub>/search` for full engagement at 100 QPM. Engine stays zero-key by default; dormant unless the user opts in. The only ToS-clean live-complete-engagement path. | high | med | low |
 | 8 | precision | **Phrase/bigram adjacency bonus + inlined Porter stemmer in `base.py`.** Small additive bonus when consecutive query tokens are adjacent in the title (contiguous "web scraping" beats scattered), capped below a true full match. Inline a ~200-line public-domain Porter stemmer (zero deps) on query+title tokens for recall. Leave the CJK bigram path unchanged. | high | med | **med** |
-| 9 | precision | **"No strongly-relevant results" signal + selective URL canonicalization.** (a) If the merged pool's max relevance < 0.5 or all top items are floored/degraded, emit an explicit banner instead of presenting noise as findings. (b) In `canonical_url`, strip only known tracking params (utm_*, fbclid, gclid, ref) + unfold AMP/mobile hosts, instead of dropping ALL query strings. | med | small | low |
+| ~~9~~ | precision | **✅ DONE 2026-06-11 (iteration 5)** — (a) per-source `⚠ no strongly-relevant results` flag + global NOTE when max relevance < 0.4 (`render.py`). (b) `canonical_url` strips only tracking params + unfolds m./amp. hosts + `/amp`, keeps content params (fixes `?v=`/`?id=` over-collapse). 10 new tests. | med | small | low |
 | 10 | reddit | **Formalize Reddit `.rss` as the honest degraded FLOOR tier** (`www.reddit.com/r/<sub>/search.rss?...` + site-wide, via `get_text`; Atom parse; `degraded=true`, no engagement). Guarantees the engine never returns zero Reddit results when PullPush/Arctic-Shift/JSON are down. (Partly exists; make it the explicit last tier.) | med | small | low |
 | 11 | speed | **Conditional GET (ETag / If-Modified-Since + 304) layered on the day cache.** Persist last ETag + Last-Modified per URL in `cache.py`; on a cache MISS send `If-None-Match`/`If-Modified-Since`; catch `HTTPError` code 304 and serve the cached body. Saves payload transfer cross-day + for non-day-cached sources. Scope to sources that actually return validators. | med | med | low |
 | 12 | new-source | **arXiv source** for research/ML topics (`export.arxiv.org/api/query?search_query=all:<q>&sortBy=submittedDate&sortOrder=descending&max_results=50`, Atom). Window-filter on `published`. Degraded (no engagement). Etiquette ≤1 req/3s single connection; sporadic 429s since ~Feb 2026 (engine backs off). | med | small | low |

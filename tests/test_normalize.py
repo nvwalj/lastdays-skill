@@ -11,6 +11,27 @@ def test_canonical_url_normalizes():
     assert a == b == "https://reddit.com/r/x"
 
 
+def test_canonical_url_strips_only_tracking_keeps_content_params():
+    c = normalize.canonical_url
+    # tracking params dropped
+    assert c("https://e.com/a?fbclid=z&gclid=q&ref=hn") == "https://e.com/a"
+    assert c("https://e.com/a?utm_medium=x&id=9") == c("https://e.com/a?id=9")
+    # content params KEPT and DISTINCT (the old drop-all behavior wrongly merged these)
+    assert c("https://youtube.com/watch?v=AAA") != c("https://youtube.com/watch?v=BBB")
+    assert c("https://e.com/p?id=1") != c("https://e.com/p?id=2")
+    # query value case preserved (distinct video ids)
+    assert c("https://youtube.com/watch?v=aB") != c("https://youtube.com/watch?v=AB")
+    # param order normalized
+    assert c("https://e.com/a?b=2&a=1") == c("https://e.com/a?a=1&b=2")
+
+
+def test_canonical_url_unfolds_mobile_amp_hosts_and_path():
+    c = normalize.canonical_url
+    assert c("https://m.example.com/a") == c("https://example.com/a")
+    assert c("https://amp.example.com/a") == c("https://example.com/a")
+    assert c("https://example.com/story/amp") == c("https://example.com/story")
+
+
 def test_dedupe_keeps_higher_score():
     a = Item(source="reddit", lang="en", title="t", url="https://x.com/a", score=10)
     b = Item(source="reddit", lang="en", title="t", url="https://www.x.com/a/", score=20)
